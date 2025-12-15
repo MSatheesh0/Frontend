@@ -140,9 +140,9 @@ class _AddEventScreenState extends State<AddEventScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Event created successfully!'),
+            content: Text('✅ Event created! Waiting for admin verification'),
             backgroundColor: AppTheme.successColor,
-            duration: Duration(seconds: 2),
+            duration: Duration(seconds: 3),
           ),
         );
         Navigator.pop(context, true); // Return true to indicate success

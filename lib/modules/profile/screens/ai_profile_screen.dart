@@ -12,7 +12,7 @@ import '../utils/theme.dart';
 import '../screens/assistant_chat_screen.dart';
 import '../screens/my_spaces_screen.dart';
 import '../screens/auth_entry_screen.dart';
-import '../screens/edit_profile_screen.dart';
+import '../../../screens/edit_profile_screen.dart';
 
 class AIProfileScreen extends StatefulWidget {
   const AIProfileScreen({super.key});
@@ -142,7 +142,7 @@ class _AIProfileScreenState extends State<AIProfileScreen> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => EditProfileScreen(authService: authService),
+        builder: (context) => const EditProfileScreen(),
       ),
     );
 

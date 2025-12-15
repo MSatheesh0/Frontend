@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../services/networking_service.dart';
+import '../services/app_state.dart';
 import '../utils/theme.dart';
 import 'profile_viewer_screen.dart';
+import 'main_screen.dart';
 
 class QrScanResultScreen extends StatefulWidget {
   final String codeId;
@@ -292,14 +295,24 @@ class _QrScanResultScreenState extends State<QrScanResultScreen> {
           ),
         );
         
-        // Auto-navigate back after showing success message
+        // Enable network mode and navigate to Tasks tab
         print('⏱️ QR SCAN: Waiting 800ms before navigation...');
         await Future.delayed(const Duration(milliseconds: 800));
-        print('🔙 QR SCAN: Attempting to navigate back, mounted=$mounted');
+        print('🔙 QR SCAN: Enabling network mode and navigating to Tasks, mounted=$mounted');
         if (mounted) {
-          print('✅ QR SCAN: Calling Navigator.pop');
-          Navigator.pop(context);
-          print('✅ QR SCAN: Navigator.pop completed');
+          // Enable network mode in AppState
+          final appState = Provider.of<AppState>(context, listen: false);
+          await appState.setNetworkingMode(true);
+          print('✅ QR SCAN: Network mode enabled');
+          
+          // Navigate to main screen (which will auto-switch to Tasks tab)
+          if (mounted) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => const MainScreen()),
+              (route) => false,
+            );
+            print('✅ QR SCAN: Navigated to Main Screen with network mode');
+          }
         } else {
           print('⚠️ QR SCAN: Widget no longer mounted, skipping navigation');
         }

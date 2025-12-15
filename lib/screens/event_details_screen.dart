@@ -4,6 +4,9 @@ import '../utils/theme.dart';
 import 'create_goal_screen.dart';
 import 'event_assistant_screen.dart';
 import 'package:intl/intl.dart';
+import '../services/networking_service.dart';
+import 'package:provider/provider.dart';
+import '../services/app_state.dart';
 
 class EventDetailsScreen extends StatefulWidget {
   final Event event;
@@ -26,27 +29,39 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     _isJoined = widget.event.isJoined;
   }
 
-  void _joinEventCircle() {
-    setState(() {
-      _isJoined = true;
-    });
+  void _joinEventCircle() async {
+    try {
+      final appState = Provider.of<AppState>(context, listen: false);
+      final userId = appState.currentUser?.id ?? 'user_1'; // Fallback for dev
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Joined ${widget.event.name} circle!'),
-        backgroundColor: AppTheme.successColor,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+      await NetworkingService().joinEvent(
+        eventId: widget.event.id,
+        participantId: userId,
+      );
+      
+      setState(() {
+        _isJoined = true;
+      });
 
-    // TODO: Add event circle to user's data
-    // TODO: Create EventCircle object
-    // final eventCircle = EventCircle(
-    //   id: 'circle_${widget.event.id}',
-    //   eventId: widget.event.id,
-    //   eventName: widget.event.name,
-    //   joinedAt: DateTime.now(),
-    // );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Joined ${widget.event.name} circle!'),
+            backgroundColor: AppTheme.successColor,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to join event. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _createGoalForEvent() {

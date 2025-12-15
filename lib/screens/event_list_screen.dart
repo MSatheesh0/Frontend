@@ -5,7 +5,11 @@ import '../services/networking_service.dart';
 import 'event_details_screen.dart';
 import 'event_assistant_screen.dart';
 import 'add_event_screen.dart';
+import 'add_event_screen.dart';
 import 'package:intl/intl.dart';
+import '../services/auth_service.dart';
+import 'package:provider/provider.dart';
+import '../services/app_state.dart';
 
 class EventListScreen extends StatefulWidget {
   const EventListScreen({super.key});
@@ -31,8 +35,14 @@ class _EventListScreenState extends State<EventListScreen> {
       
       setState(() {
         _events = eventsData.map((eventData) {
+          final eventId = eventData['_id'] ?? eventData['id'] ?? '';
+          print('🎯 Parsing event: ${eventData['name']}');
+          print('   - _id field: ${eventData['_id']}');
+          print('   - id field: ${eventData['id']}');
+          print('   - Final eventId: $eventId');
+          
           return Event(
-            id: eventData['id'] ?? '',
+            id: eventId, // Check both MongoDB _id and id
             name: eventData['name'] ?? '',
             headline: eventData['headline'],
             description: eventData['description'] ?? '',
@@ -51,6 +61,17 @@ class _EventListScreenState extends State<EventListScreen> {
             tags: eventData['tags'] != null 
                 ? List<String>.from(eventData['tags']) 
                 : [],
+            attendees: eventData['attendees'] != null
+                ? List<String>.from(eventData['attendees'])
+                : [],
+            // Automatically determine joined status based on current user ID
+            // For now, we'll confirm via attendees check if possible, or fallback to existing isJoined
+            // Note: The previous logic was causing duplicated argument error because isJoined was passed above.
+            // We should use the logic here to override or remove the previous passing.
+            // Since we passed 'isJoined: eventData['isJoined'] ?? false' above, let's remove this block
+            // OR update the above block. 
+            // I will remove this duplicate block and let the logic be handled clean. 
+            
             // For now, we'll set these as default values
             // In a real app, you'd calculate these based on user preferences
             isPrimaryRecommendation: false,
@@ -98,23 +119,45 @@ class _EventListScreenState extends State<EventListScreen> {
     );
   }
 
-  void _joinEventCircle(Event event) {
-    setState(() {
-      _events = _events.map((e) {
-        if (e.id == event.id) {
-          return e.copyWith(isJoined: true);
-        }
-        return e;
-      }).toList();
-    });
+  void _joinEventCircle(Event event) async {
+    try {
+      final appState = Provider.of<AppState>(context, listen: false);
+      final userId = appState.currentUser?.id ?? 'user_1';
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Joined ${event.name} circle!'),
-        backgroundColor: AppTheme.successColor,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+      await _networkingService.joinEvent(
+        eventId: event.id,
+        participantId: userId,
+      );
+
+      if (mounted) {
+        setState(() {
+          _events = _events.map((e) {
+            if (e.id == event.id) {
+              return e.copyWith(isJoined: true);
+            }
+            return e;
+          }).toList();
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Joined ${event.name} circle!'),
+            backgroundColor: AppTheme.successColor,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error joining event: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to join event. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _openEventAssistant(Event event) {

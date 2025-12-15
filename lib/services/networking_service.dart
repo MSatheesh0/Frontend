@@ -805,6 +805,32 @@ class NetworkingService {
     }
   }
 
+  /// Join an event (Event Connections)
+  Future<Map<String, dynamic>> joinEvent({
+    required String eventId,
+    required String participantId,
+  }) async {
+    if (ApiConfig.useMockAuth) {
+      return {'success': true, 'message': 'Joined mock event'};
+    }
+
+    try {
+      final body = {
+        'eventId': eventId,
+        'participantId': participantId,
+      };
+
+      final response = await _apiClient.post('/event-connections/join', body: body);
+      print('✅ Joined event: $eventId');
+      return response;
+    } catch (e) {
+      print('❌ Join event failed: $e');
+      rethrow;
+    }
+  }
+
+
+
   /// Delete an event
   Future<void> deleteEvent(String eventId) async {
     if (ApiConfig.useMockAuth) return;
@@ -837,16 +863,30 @@ class NetworkingService {
     }
 
     try {
+      print('📥 Fetching all events from backend...');
       final response = await _apiClient.get('/events');
+      print('📦 Events response type: ${response.runtimeType}');
       
       if (response is Map<String, dynamic> && response.containsKey('data')) {
         final data = response['data'];
         if (data is List) {
+          print('✅ Got ${data.length} events from wrapped response');
+          if (data.isNotEmpty) {
+            print('   First event keys: ${data[0].keys.toList()}');
+            print('   First event _id: ${data[0]['_id']}');
+            print('   First event id: ${data[0]['id']}');
+          }
           return List<Map<String, dynamic>>.from(data);
         }
       }
       
       if (response is List) {
+        print('✅ Got ${response.length} events from direct list');
+        if (response.isNotEmpty) {
+          print('   First event keys: ${response[0].keys.toList()}');
+          print('   First event _id: ${response[0]['_id']}');
+          print('   First event id: ${response[0]['id']}');
+        }
         return List<Map<String, dynamic>>.from(response);
       }
       return [];

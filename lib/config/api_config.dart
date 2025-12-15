@@ -33,7 +33,7 @@ class ApiConfig {
   static const String verifyOtpEndpoint = '/auth/verify-otp';
   
   // User
-  static const String userProfileEndpoint = '/me';
+  static const String userProfileEndpoint = '/users/me';
   
   // Network Codes
   static const String networkCodesEndpoint = '/network-codes';

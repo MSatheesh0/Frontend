@@ -16,7 +16,7 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
-  static const String _channelId = 'networking_qr_channel';
+  static const String _channelId = 'networking_qr_channel_v2'; // Updated channel ID for new settings
   static const String _channelName = 'Networking QR Code';
   static const String _channelDescription =
       'Shows your QR code when Networking Mode is active';
@@ -44,9 +44,9 @@ class NotificationService {
       _channelId,
       _channelName,
       description: _channelDescription,
-      importance: Importance.low, // Low distinct to not make noise but stay visible
+      importance: Importance.max, // MAX importance for full screen intent
       playSound: false,
-      enableVibration: false,
+      enableVibration: true,
     );
      // Note: for older flutter_local_notifications versions, createNotificationChannel might need 'resolvePlatformSpecificImplementation'.
      // For version 17+, it works like this:
@@ -64,16 +64,19 @@ class NotificationService {
     required String codeId
   }) async {
     try {
-      // 1. Download image
-      final String imageUrl = 'https://quickchart.io/qr?text=${Uri.encodeComponent(codeId)}&size=300';
+      // 1. Download image - increased size for better visibility
+      final String imageUrl = 'https://quickchart.io/qr?text=${Uri.encodeComponent(codeId)}&size=600&margin=2';
       final String largeIconPath = await _downloadAndSaveFile(imageUrl, 'qr_image.png');
 
-      // 2. Configure Notification style
+      // 2. Configure Notification style - optimized for large image
       final BigPictureStyleInformation bigPictureStyleInformation =
           BigPictureStyleInformation(
         FilePathAndroidBitmap(largeIconPath),
         contentTitle: title,
         summaryText: body,
+        hideExpandedLargeIcon: true, // Hides the small icon when expanded to show full picture
+        htmlFormatContentTitle: true,
+        htmlFormatSummaryText: true,
       );
 
       // 3. Notification Details
@@ -82,12 +85,15 @@ class NotificationService {
         _channelId,
         _channelName,
         channelDescription: _channelDescription,
-        importance: Importance.low, // Keep it low to avoid popping up intrusively, but persistent
-        priority: Priority.low,
+        importance: Importance.max, // Max importance for heads-up
+        priority: Priority.max, // Max priority
         ongoing: true, // Make it persistent (cannot be dismissed)
         autoCancel: false,
         styleInformation: bigPictureStyleInformation,
         largeIcon: FilePathAndroidBitmap(largeIconPath), // Show QR as large icon too
+        visibility: NotificationVisibility.public, // Show on lock screen
+        fullScreenIntent: true, // Allow full screen intent
+        category: AndroidNotificationCategory.call, // Treat as incoming call for high priority
       );
 
       final NotificationDetails platformChannelSpecifics =

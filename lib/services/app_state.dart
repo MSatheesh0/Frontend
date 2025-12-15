@@ -10,7 +10,6 @@ import '../models/tagged_person.dart' as tagged;
 import '../services/mock_data_service.dart';
 import '../services/auth_service.dart';
 import '../services/networking_service.dart';
-import '../services/notification_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
 
@@ -129,7 +128,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setNetworkingMode(bool value) async {
+  Future<void> setNetworkingMode(bool value) async {
     _isNetworkingMode = value;
     
     // Save to storage
@@ -137,26 +136,6 @@ class AppState extends ChangeNotifier {
       key: _networkModeKey, 
       value: value.toString(),
     );
-    
-    // Toggle persistent notification
-    if (_isNetworkingMode) {
-      if (_selectedNetworkCode != null) {
-        NotificationService().showPersistentQrNotification(
-          title: 'Networking Mode Active',
-          body: 'Scan to connect with ${_selectedNetworkCode!.name}',
-          codeId: _selectedNetworkCode!.codeId,
-        );
-      } else {
-        // Fallback or just don't show if no code selected
-         NotificationService().showPersistentQrNotification(
-          title: 'Networking Mode Active',
-          body: 'Share your profile to connect at default',
-          codeId: _currentUser?.id ?? 'Unknown',
-        );
-      }
-    } else {
-      NotificationService().cancelQrNotification();
-    }
     
     notifyListeners();
   }
@@ -170,14 +149,6 @@ class AppState extends ChangeNotifier {
       value: jsonEncode(code.toJson()),
     );
     
-    // If already in networking mode, update the notification
-    if (_isNetworkingMode) {
-      NotificationService().showPersistentQrNotification(
-        title: 'Networking Mode Active',
-        body: 'Scan to connect with ${code.name}',
-        codeId: code.codeId,
-      );
-    }
     notifyListeners();
   }
 
@@ -202,16 +173,6 @@ class AppState extends ChangeNotifier {
         } catch (e) {
           print('  - Error restoring selected network code: $e');
         }
-      }
-      
-      // Restore notification if mode was active
-      if (_isNetworkingMode && _selectedNetworkCode != null) {
-        print('🟣 SHOWING PERSISTENT NOTIFICATION');
-        NotificationService().showPersistentQrNotification(
-          title: 'Networking Mode Active',
-          body: 'Scan to connect with ${_selectedNetworkCode!.name}',
-          codeId: _selectedNetworkCode!.codeId,
-        );
       }
       
       print('✅ NETWORK MODE STATE RESTORED');

@@ -18,6 +18,7 @@ class Event {
   final String? matchLevel; // "High match", "Medium match", or percentage
   final int? matchPercentage; // 0-100
   final bool isPrimaryRecommendation; // Top curated vs "other circles"
+  final List<String> attendees; // List of user IDs who joined
   final bool isDismissed; // User marked "Not interested"
 
   Event({
@@ -29,6 +30,7 @@ class Event {
     required this.location,
     this.imageUrl,
     this.isJoined = false,
+    this.attendees = const [],
     this.photos = const [],
     this.videos = const [],
     this.tags = const [],
@@ -48,6 +50,7 @@ class Event {
     String? location,
     String? imageUrl,
     bool? isJoined,
+    List<String>? attendees,
     List<String>? photos,
     List<String>? videos,
     List<String>? tags,
@@ -66,6 +69,7 @@ class Event {
       location: location ?? this.location,
       imageUrl: imageUrl ?? this.imageUrl,
       isJoined: isJoined ?? this.isJoined,
+      attendees: attendees ?? this.attendees,
       photos: photos ?? this.photos,
       videos: videos ?? this.videos,
       tags: tags ?? this.tags,

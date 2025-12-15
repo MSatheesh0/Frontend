@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../models/network_code.dart';
 import '../utils/theme.dart';
 
-class NetworkCodeCard extends StatelessWidget {
+class NetworkCodeCard extends StatefulWidget {
   final NetworkCode code;
   final VoidCallback onTapDropdown;
 
@@ -13,14 +14,73 @@ class NetworkCodeCard extends StatelessWidget {
     required this.onTapDropdown,
   });
 
+  @override
+  State<NetworkCodeCard> createState() => _NetworkCodeCardState();
+}
+
+class _NetworkCodeCardState extends State<NetworkCodeCard> {
+  bool _isWallpaperEnabled = false;
+  bool _isLoadingWallpaper = false;
+
+  static const platform = MethodChannel('com.waytree.app/wallpaper');
+
   void _copyCodeId(BuildContext context) {
-    Clipboard.setData(ClipboardData(text: code.codeId));
+    Clipboard.setData(ClipboardData(text: widget.code.codeId));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Copied ${code.codeId} to clipboard'),
+        content: Text('Copied ${widget.code.codeId} to clipboard'),
         duration: const Duration(seconds: 2),
       ),
     );
+  }
+
+  Future<void> _toggleWallpaper(bool value) async {
+    setState(() {
+      _isLoadingWallpaper = true;
+    });
+
+    try {
+      if (value) {
+        // Set wallpaper
+        // Use higher resolution for wallpaper
+        final url = 'https://quickchart.io/qr?text=${Uri.encodeComponent(widget.code.codeId)}&size=1080';
+        
+        final result = await platform.invokeMethod('setWallpaper', {
+          'url': url,
+          'networkName': widget.code.name,
+          'codeId': widget.code.codeId,
+        });
+
+        if (result == true) {
+          setState(() {
+            _isWallpaperEnabled = true;
+          });
+        }
+      } else {
+        // Disable wallpaper
+        setState(() {
+          _isWallpaperEnabled = false;
+        });
+      }
+    } on PlatformException catch (e) {
+      // Silent error handling - just reset state
+      print('Wallpaper error: ${e.message}');
+      setState(() {
+        _isWallpaperEnabled = false;
+      });
+    } catch (e) {
+      // Silent error handling - just reset state
+      print('Wallpaper error: $e');
+      setState(() {
+        _isWallpaperEnabled = false;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingWallpaper = false;
+        });
+      }
+    }
   }
 
   @override
@@ -35,38 +95,93 @@ class NetworkCodeCard extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Dropdown selector
-          InkWell(
-            onTap: onTapDropdown,
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppConstants.spacingMd,
-                vertical: AppConstants.spacingSm,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    code.name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+          // Header Row: Dropdown selector + Wallpaper Toggle
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Dropdown selector
+              InkWell(
+                onTap: widget.onTapDropdown,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppConstants.spacingMd,
+                    vertical: AppConstants.spacingSm,
                   ),
-                  const SizedBox(width: AppConstants.spacingSm),
-                  Icon(
-                    Icons.keyboard_arrow_down,
-                    color: AppTheme.textSecondary,
-                    size: 20,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+                    border: Border.all(color: Colors.grey[300]!),
                   ),
-                ],
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        widget.code.name,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: AppConstants.spacingSm),
+                      Icon(
+                        Icons.keyboard_arrow_down,
+                        color: AppTheme.textSecondary,
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
+            ],
+          ),
+          const SizedBox(height: AppConstants.spacingMd),
+          
+          // Wallpaper Toggle Section
+          Column(
+            children: [
+              Container(
+                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                 decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[200]!),
+                 ),
+                 child: Row(
+                   mainAxisSize: MainAxisSize.min,
+                   children: [
+                     Icon(
+                       Icons.lock_clock, // Lock screen icon
+                       size: 20, 
+                       color: _isWallpaperEnabled ? AppTheme.primaryColor : Colors.grey[600]
+                     ),
+                     const SizedBox(width: 8),
+                     SizedBox(
+                       height: 28,
+                       child: _isLoadingWallpaper 
+                        ? const Padding(
+                            padding: EdgeInsets.all(4.0),
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Switch(
+                           value: _isWallpaperEnabled,
+                           onChanged: _toggleWallpaper,
+                           activeColor: AppTheme.primaryColor,
+                           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                         ),
+                     ),
+                   ],
+                 ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Enable to show in lock screen wallpaper',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey[600],
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: AppConstants.spacingXl),
 
@@ -84,7 +199,7 @@ class NetworkCodeCard extends StatelessWidget {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(AppConstants.radiusMd),
                   child: Image.network(
-                    'https://quickchart.io/qr?text=${Uri.encodeComponent(code.codeId)}&size=220',
+                    'https://quickchart.io/qr?text=${Uri.encodeComponent(widget.code.codeId)}&size=220',
                     fit: BoxFit.cover,
                     loadingBuilder: (context, child, loadingProgress) {
                       if (loadingProgress == null) return child;
@@ -122,7 +237,7 @@ class NetworkCodeCard extends StatelessWidget {
                   ),
                 ),
               ),
-              if (!code.isActive)
+              if (!widget.code.isActive)
                 Container(
                   width: 220,
                   height: 220,
@@ -185,7 +300,7 @@ class NetworkCodeCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  code.codeId,
+                  widget.code.codeId,
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -206,7 +321,7 @@ class NetworkCodeCard extends StatelessWidget {
           const SizedBox(height: AppConstants.spacingMd),
 
           // Keywords/description
-          if (code.keywords.isNotEmpty)
+          if (widget.code.keywords.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppConstants.spacingMd,
@@ -215,7 +330,7 @@ class NetworkCodeCard extends StatelessWidget {
                 spacing: AppConstants.spacingXs,
                 runSpacing: AppConstants.spacingXs,
                 alignment: WrapAlignment.center,
-                children: code.keywords.take(5).map<Widget>((keyword) {
+                children: widget.code.keywords.take(5).map<Widget>((keyword) {
                   return Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppConstants.spacingSm,
