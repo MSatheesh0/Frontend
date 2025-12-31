@@ -101,6 +101,14 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: AppConstants.spacingMd),
 
+                // Phone Number
+                _buildInfoCard(
+                  icon: Icons.phone_outlined,
+                  label: 'Phone Number',
+                  value: user.phoneNumber ?? '',
+                ),
+                const SizedBox(height: AppConstants.spacingMd),
+
                 // Company
                 _buildInfoCard(
                   icon: Icons.business_outlined,

@@ -10,6 +10,7 @@ class User {
   final String? oneLiner;
   final String? website;
   final String? photoUrl;
+  final String? phoneNumber;
   final List<String> interests;
 
   User({
@@ -24,6 +25,7 @@ class User {
     this.oneLiner,
     this.website,
     this.photoUrl,
+    this.phoneNumber,
     this.interests = const [],
   });
 
@@ -47,6 +49,7 @@ class User {
       oneLiner: map['oneLiner'],
       website: map['website'],
       photoUrl: map['photoUrl'],
+      phoneNumber: map['phoneNumber'],
       interests: List<String>.from(map['interests'] ?? []),
     );
   }

@@ -26,6 +26,7 @@ class SignupDetailsScreen extends StatefulWidget {
 class _SignupDetailsScreenState extends State<SignupDetailsScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _otherRoleController = TextEditingController();
 
   String? _selectedRole;
@@ -36,12 +37,14 @@ class _SignupDetailsScreenState extends State<SignupDetailsScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _phoneController.dispose();
     _otherRoleController.dispose();
     super.dispose();
   }
 
   bool get _isFormValid {
     return _nameController.text.trim().isNotEmpty &&
+        _phoneController.text.trim().isNotEmpty &&
         _selectedRole != null &&
         _selectedGoal != null &&
         (_selectedRole != UserRole.other || _otherRole != null);
@@ -70,6 +73,7 @@ class _SignupDetailsScreenState extends State<SignupDetailsScreen> {
         id: currentUser['id'], // Use existing ID from backend
         email: widget.email,
         name: _nameController.text.trim(),
+        phoneNumber: _phoneController.text.trim(),
         role: UserRole.toApiValue((_selectedRole == UserRole.other ? _otherRole : _selectedRole) ?? ''),
         primaryGoal: PrimaryGoal.toApiValue(_selectedGoal ?? ''),
       );
@@ -168,6 +172,51 @@ class _SignupDetailsScreenState extends State<SignupDetailsScreen> {
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return 'Please enter your name';
+                          }
+                          return null;
+                        },
+                        onChanged: (_) => setState(() {}),
+                      ),
+
+                      const SizedBox(height: AppConstants.spacingXl),
+
+                      // Phone Number
+                      Text(
+                        'What\'s your phone number?',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: AppConstants.spacingSm),
+                      TextFormField(
+                        controller: _phoneController,
+                        enabled: !_isLoading,
+                        keyboardType: TextInputType.phone,
+                        decoration: InputDecoration(
+                          hintText: 'Phone number',
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppConstants.radiusMd),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppConstants.radiusMd),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Please enter your phone number';
+                          }
+                          // Regex for strictly 10 digits
+                          final phoneRegex = RegExp(r'^[0-9]{10}$');
+                          if (!phoneRegex.hasMatch(value.trim())) {
+                            return 'Please enter a valid 10-digit phone number';
                           }
                           return null;
                         },

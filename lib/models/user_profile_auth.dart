@@ -9,6 +9,7 @@ class UserProfile {
   final String? website;
   final String? location;
   final String? oneLiner;
+  final String? phoneNumber;
   final DateTime createdAt;
 
   UserProfile({
@@ -21,6 +22,7 @@ class UserProfile {
     this.website,
     this.location,
     this.oneLiner,
+    this.phoneNumber,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
@@ -34,6 +36,7 @@ class UserProfile {
         'website': website,
         'location': location,
         'oneLiner': oneLiner,
+        'phoneNumber': phoneNumber,
         'createdAt': createdAt.toIso8601String(),
       };
 
@@ -47,6 +50,7 @@ class UserProfile {
         website: json['website'] as String?,
         location: json['location'] as String?,
         oneLiner: json['oneLiner'] as String?,
+        phoneNumber: json['phoneNumber'] as String?,
         createdAt: DateTime.parse(json['createdAt'] as String),
       );
 
@@ -60,6 +64,7 @@ class UserProfile {
     String? website,
     String? location,
     String? oneLiner,
+    String? phoneNumber,
   }) =>
       UserProfile(
         id: id ?? this.id,
@@ -71,6 +76,7 @@ class UserProfile {
         website: website ?? this.website,
         location: location ?? this.location,
         oneLiner: oneLiner ?? this.oneLiner,
+        phoneNumber: phoneNumber ?? this.phoneNumber,
         createdAt: createdAt,
       );
 }

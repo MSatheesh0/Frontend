@@ -21,6 +21,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _locationController;
   late TextEditingController _bioController;
   late TextEditingController _websiteController;
+  late TextEditingController _phoneController;
   
   String? _profilePhotoPath;
   bool _isLoading = false;
@@ -39,6 +40,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _locationController = TextEditingController(text: user?.location ?? '');
     _bioController = TextEditingController(text: user?.oneLiner ?? '');
     _websiteController = TextEditingController(text: user?.website ?? '');
+    _phoneController = TextEditingController(text: user?.phoneNumber ?? '');
     _profilePhotoPath = user?.photoUrl;
   }
 
@@ -50,6 +52,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _locationController.dispose();
     _bioController.dispose();
     _websiteController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -139,6 +142,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'location': _locationController.text.trim(),
         'oneLiner': _bioController.text.trim(),
         'website': _websiteController.text.trim(),
+        'phoneNumber': _phoneController.text.trim(),
         'photoUrl': _profilePhotoPath ?? '',
         'headline': '${_roleController.text.trim()} at ${_companyController.text.trim()}',
       };
@@ -334,6 +338,32 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       borderRadius: BorderRadius.circular(AppConstants.radiusMd),
                     ),
                   ),
+                ),
+                const SizedBox(height: AppConstants.spacingLg),
+
+                // Phone Number
+                TextFormField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: 'Phone Number *',
+                    hintText: 'Enter your phone number',
+                    prefixIcon: const Icon(Icons.phone_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your phone number';
+                    }
+                    // Regex for strictly 10 digits
+                    final phoneRegex = RegExp(r'^[0-9]{10}$');
+                    if (!phoneRegex.hasMatch(value.trim())) {
+                      return 'Please enter a valid 10-digit phone number';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: AppConstants.spacingLg),
 

@@ -85,6 +85,9 @@ class _EventListScreenState extends State<EventListScreen> {
                 ? List<String>.from(eventData['attendees'])
                 : [],
             isPrimaryRecommendation: false,
+            createdBy: eventData['createdBy'] is Map 
+                ? (eventData['createdBy']['_id'] ?? eventData['createdBy']['id']) 
+                : eventData['createdBy'],
           );
         }).where((event) => !event.isDismissed).toList().cast<Event>();
       });

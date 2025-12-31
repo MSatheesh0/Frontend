@@ -23,6 +23,7 @@ class Event {
   final bool isCommunity;
   final bool isVerified; // Verified by admin
   final bool isDismissed; // User marked "Not interested"
+  final String? createdBy; // ID of the creator
 
   Event({
     required this.id,
@@ -45,6 +46,7 @@ class Event {
     this.matchPercentage,
     this.isPrimaryRecommendation = false,
     this.isDismissed = false,
+    this.createdBy,
   });
 
   Event copyWith({
@@ -68,6 +70,7 @@ class Event {
     int? matchPercentage,
     bool? isPrimaryRecommendation,
     bool? isDismissed,
+    String? createdBy,
   }) {
     return Event(
       id: id ?? this.id,
@@ -91,6 +94,7 @@ class Event {
       isPrimaryRecommendation:
           isPrimaryRecommendation ?? this.isPrimaryRecommendation,
       isDismissed: isDismissed ?? this.isDismissed,
+      createdBy: createdBy ?? this.createdBy,
     );
   }
 }

@@ -61,25 +61,29 @@ class _AssistantEnrichmentScreenState extends State<AssistantEnrichmentScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // TODO: Old auth system
-      /* await widget.authService.updateUserProfile(
-        company: _companyController.text.trim().isEmpty
-            ? null
-            : _companyController.text.trim(),
-        website: _websiteController.text.trim().isEmpty
-            ? null
-            : _websiteController.text.trim(),
-        location: _locationController.text.trim().isEmpty
-            ? null
-            : _locationController.text.trim(),
-        oneLiner: _oneLinerController.text.trim().isEmpty
-            ? null
-            : _oneLinerController.text.trim(),
-      ); */
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile update not available yet')),
-      );
+      final updates = {
+        if (_companyController.text.trim().isNotEmpty)
+          'company': _companyController.text.trim(),
+        if (_websiteController.text.trim().isNotEmpty)
+          'website': _websiteController.text.trim(),
+        if (_locationController.text.trim().isNotEmpty)
+          'location': _locationController.text.trim(),
+        if (_oneLinerController.text.trim().isNotEmpty)
+          'oneLiner': _oneLinerController.text.trim(),
+      };
+
+      if (updates.isNotEmpty) {
+        await widget.authService.updateUserProfile(updates);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Profile updated successfully!'),
+              backgroundColor: AppTheme.successColor,
+            ),
+          );
+        }
+      }
 
       if (!mounted) return;
 

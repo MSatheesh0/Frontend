@@ -260,79 +260,68 @@ class _AddEventScreenState extends State<AddEventScreen> {
           padding: const EdgeInsets.all(AppConstants.spacingLg),
           children: [
             // Type Toggles
+            // Type Selection Buttons
             Row(
               children: [
-                // Event Toggle
+                // Event Button
                 Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey[300]!),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Event',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.textPrimary,
-                          ),
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _isEvent = true;
+                        _isCommunity = false;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _isEvent ? AppTheme.primaryColor : Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: _isEvent ? AppTheme.primaryColor : Colors.grey[300]!,
                         ),
-                        Switch(
-                          value: _isEvent,
-                          activeColor: AppTheme.primaryColor,
-                          onChanged: (value) {
-                            if (value) {
-                              setState(() {
-                                _isEvent = true;
-                                _isCommunity = false;
-                              });
-                            }
-                          },
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Event',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: _isEvent ? Colors.white : AppTheme.textPrimary,
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 16),
                 
-                // Community Toggle
+                // Community Button
                 Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey[300]!),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Community',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.textPrimary,
-                          ),
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _isCommunity = true;
+                        _isEvent = false;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _isCommunity ? AppTheme.primaryColor : Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: _isCommunity ? AppTheme.primaryColor : Colors.grey[300]!,
                         ),
-                        Switch(
-                          value: _isCommunity,
-                          activeColor: AppTheme.primaryColor,
-                          onChanged: (value) {
-                            if (value) {
-                              setState(() {
-                                _isCommunity = true;
-                                _isEvent = false;
-                              });
-                            }
-                          },
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Community',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: _isCommunity ? Colors.white : AppTheme.textPrimary,
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ),

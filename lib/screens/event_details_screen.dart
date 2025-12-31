@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../services/networking_service.dart';
 import 'package:provider/provider.dart';
 import '../services/app_state.dart';
+import 'event_members_screen.dart';
 
 class EventDetailsScreen extends StatefulWidget {
   final Event event;
@@ -90,6 +91,11 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     final dateFormat = DateFormat('EEEE, MMMM dd, yyyy');
     final timeFormat = DateFormat('h:mm a');
 
+    final appState = Provider.of<AppState>(context);
+    final isCreator = appState.currentUser?.id == widget.event.createdBy;
+    final isAdmin = appState.currentUser?.role == 'admin'; // Assuming role check
+    final canViewMembers = isCreator || isAdmin;
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -107,6 +113,23 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           ),
         ),
         actions: [
+          if (canViewMembers)
+            IconButton(
+              icon: const Icon(Icons.people, color: AppTheme.textPrimary),
+              tooltip: 'View Members',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => EventMembersScreen(
+                      eventId: widget.event.id,
+                      eventName: widget.event.name,
+                      isOrganizer: canViewMembers,
+                    ),
+                  ),
+                );
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.share, color: AppTheme.textPrimary),
             onPressed: () {
