@@ -7,9 +7,11 @@ import 'event_assistant_screen.dart';
 import 'add_event_screen.dart';
 import 'add_event_screen.dart';
 import 'package:intl/intl.dart';
+// Check AuthService import
 import '../services/auth_service.dart';
 import 'package:provider/provider.dart';
 import '../services/app_state.dart';
+import '../models/user.dart';
 
 class EventListScreen extends StatefulWidget {
   const EventListScreen({super.key});
@@ -21,6 +23,7 @@ class EventListScreen extends StatefulWidget {
 class _EventListScreenState extends State<EventListScreen> {
   final _networkingService = NetworkingService();
   List<Event> _events = [];
+  String _selectedTab = 'event'; // 'event' or 'community'
 
   @override
   void initState() {
@@ -33,16 +36,30 @@ class _EventListScreenState extends State<EventListScreen> {
       // Load events from database
       final eventsData = await _networkingService.getAllEvents();
       
+      if (!mounted) return;
+
       setState(() {
         _events = eventsData.map((eventData) {
           final eventId = eventData['_id'] ?? eventData['id'] ?? '';
-          print('🎯 Parsing event: ${eventData['name']}');
-          print('   - _id field: ${eventData['_id']}');
-          print('   - id field: ${eventData['id']}');
-          print('   - Final eventId: $eventId');
           
+          // Parsing with default fallbacks
+          // Note: If backend doesn't return these fields (old code running),
+          // isEvent defaults to true, isCommunity to false.
+          final isEvt = eventData['isEvent'] ?? true;
+          final isComm = eventData['isCommunity'] ?? false;
+          final isVer = eventData['isVerified'] ?? false;
+          
+          // STRICT DEBUG LOGGING
+          print('--------------------------------------------------');
+          print('EventID: $eventId');
+          print('Name: ${eventData['name']}');
+          print('Raw isEvent: ${eventData['isEvent']} -> Parsed: $isEvt');
+          print('Raw isCommunity: ${eventData['isCommunity']} -> Parsed: $isComm');
+          print('Raw isVerified: ${eventData['isVerified']} -> Parsed: $isVer');
+          print('--------------------------------------------------');
+
           return Event(
-            id: eventId, // Check both MongoDB _id and id
+            id: eventId,
             name: eventData['name'] ?? '',
             headline: eventData['headline'],
             description: eventData['description'] ?? '',
@@ -51,6 +68,9 @@ class _EventListScreenState extends State<EventListScreen> {
                 : DateTime.now(),
             location: eventData['location'] ?? '',
             imageUrl: eventData['imageUrl'],
+            isEvent: isEvt, 
+            isCommunity: isComm,
+            isVerified: isVer, // Check verification status
             isJoined: eventData['isJoined'] ?? false,
             photos: eventData['photos'] != null 
                 ? List<String>.from(eventData['photos']) 
@@ -64,29 +84,17 @@ class _EventListScreenState extends State<EventListScreen> {
             attendees: eventData['attendees'] != null
                 ? List<String>.from(eventData['attendees'])
                 : [],
-            // Automatically determine joined status based on current user ID
-            // For now, we'll confirm via attendees check if possible, or fallback to existing isJoined
-            // Note: The previous logic was causing duplicated argument error because isJoined was passed above.
-            // We should use the logic here to override or remove the previous passing.
-            // Since we passed 'isJoined: eventData['isJoined'] ?? false' above, let's remove this block
-            // OR update the above block. 
-            // I will remove this duplicate block and let the logic be handled clean. 
-            
-            // For now, we'll set these as default values
-            // In a real app, you'd calculate these based on user preferences
             isPrimaryRecommendation: false,
-            matchReason: null,
-            matchLevel: null,
-            matchPercentage: null,
           );
-        }).where((event) => !event.isDismissed).toList();
+        }).where((event) => !event.isDismissed).toList().cast<Event>();
       });
     } catch (e) {
       print('Error loading events: $e');
-      // Keep empty list on error
-      setState(() {
-        _events = [];
-      });
+      if (mounted) {
+        setState(() {
+          _events = []; // Better error handling
+        });
+      }
     }
   }
 
@@ -105,7 +113,7 @@ class _EventListScreenState extends State<EventListScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('Event dismissed'),
+        content: const Text('Dismissed'),
         action: SnackBarAction(
           label: 'Undo',
           onPressed: () {
@@ -152,7 +160,7 @@ class _EventListScreenState extends State<EventListScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Failed to join event. Please try again.'),
+            content: Text('Failed to join. Please try again.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -177,7 +185,6 @@ class _EventListScreenState extends State<EventListScreen> {
       ),
     );
 
-    // Refresh if event status changed
     if (result == true) {
       _loadEvents();
     }
@@ -185,10 +192,24 @@ class _EventListScreenState extends State<EventListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Filter logic based on user request:
+    // Tab "Events": Show if isEvent is true AND NOT isCommunity (Strict separation)
+    // Tab "Communities": Show if isCommunity is true AND isVerified is true
+    
+    final filteredEvents = _events.where((e) {
+      if (_selectedTab == 'event') {
+         // Prevent communities from showing here even if isEvent is accidentally true
+         return e.isEvent && !e.isCommunity; 
+      } else {
+         // Only show verified communities
+         return e.isCommunity && e.isVerified;
+      }
+    }).toList();
+    
     final primaryEvents =
-        _events.where((e) => e.isPrimaryRecommendation).toList();
+        filteredEvents.where((e) => e.isPrimaryRecommendation).toList();
     final otherEvents =
-        _events.where((e) => !e.isPrimaryRecommendation).toList();
+        filteredEvents.where((e) => !e.isPrimaryRecommendation).toList();
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -196,7 +217,7 @@ class _EventListScreenState extends State<EventListScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         title: const Text(
-          'Event Circles',
+          'Circles', 
           style: TextStyle(
             color: AppTheme.textPrimary,
             fontWeight: FontWeight.w600,
@@ -212,60 +233,125 @@ class _EventListScreenState extends State<EventListScreen> {
                   builder: (context) => const AddEventScreen(),
                 ),
               );
-              // Reload events if a new event was created
               if (result == true) {
                 _loadEvents();
               }
             },
-            tooltip: 'Add Event',
+            tooltip: 'Add New',
           ),
         ],
       ),
-      body: _events.isEmpty
-          ? _buildEmptyState()
-          : ListView(
-              padding: const EdgeInsets.all(AppConstants.spacingLg),
+      body: Column(
+        children: [
+          // Toggle UI
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
               children: [
-                // Header
-                Text(
-                  'Recommended for you',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textSecondary,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                Text(
-                  'Based on your active goals',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: AppConstants.spacingMd),
-
-                // Primary recommendations
-                ...primaryEvents.map((event) => _buildEventCard(event)),
-
-                // Other circles section
-                if (otherEvents.isNotEmpty) ...[
-                  const SizedBox(height: AppConstants.spacingLg),
-                  Text(
-                    'Other circles to explore',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textSecondary,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: AppConstants.spacingMd),
-                  ...otherEvents.map((event) => _buildEventCard(event)),
-                ],
+                _buildTabButton('Events', 'event'),
+                const SizedBox(width: 12),
+                _buildTabButton('Communities', 'community'),
               ],
             ),
+          ),
+          
+          Expanded(
+            child: filteredEvents.isEmpty
+              ? RefreshIndicator(
+                  onRefresh: _handleRefresh,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: SizedBox(
+                       height: MediaQuery.of(context).size.height * 0.6,
+                       child: _buildEmptyState(),
+                    ),
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _handleRefresh,
+                  child: ListView(
+                    padding: const EdgeInsets.all(AppConstants.spacingLg),
+                    children: [
+                      if (primaryEvents.isNotEmpty) ...[
+                        Text(
+                          'Recommended for you',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textSecondary,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: AppConstants.spacingMd),
+                        ...primaryEvents.map((event) => _buildEventCard(event)),
+                        const SizedBox(height: AppConstants.spacingLg),
+                      ],
+    
+                      if (otherEvents.isNotEmpty) ...[
+                        Text(
+                          'Explore ${_selectedTab == 'community' ? 'Communities' : 'Events'}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textSecondary,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: AppConstants.spacingMd),
+                        ...otherEvents.map((event) => _buildEventCard(event)),
+                      ],
+                    ],
+                  ),
+                ),
+          ),
+        ],
+      ),
     );
+  }
+
+  Widget _buildTabButton(String label, String value) {
+    final isSelected = _selectedTab == value;
+    return Expanded(
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _selectedTab = value;
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? AppTheme.primaryColor : Colors.grey[100],
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isSelected ? AppTheme.primaryColor : Colors.transparent,
+            ),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+             label,
+             style: TextStyle(
+               color: isSelected ? Colors.white : Colors.grey[600],
+               fontWeight: FontWeight.w600,
+               fontSize: 14,
+             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleRefresh() async {
+     _loadEvents();
+     // Also reload user profile for sync
+     try {
+       final userMap = await AuthService().fetchUserProfile();
+       if (mounted) {
+           final user = User.fromMap(userMap);
+           Provider.of<AppState>(context, listen: false).setUser(user);
+       }
+     } catch (_) {}
   }
 
   Widget _buildEventCard(Event event) {
@@ -357,10 +443,9 @@ class _EventListScreenState extends State<EventListScreen> {
                       ),
                   ],
                 ),
-                const SizedBox(height: AppConstants.spacingSm),
-
-                // WHY this event is relevant - PROMINENT
-                if (event.matchReason != null)
+                if (event.matchReason != null) ...[
+                  const SizedBox(height: AppConstants.spacingSm),
+                  // WHY this event is relevant
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -392,6 +477,7 @@ class _EventListScreenState extends State<EventListScreen> {
                       ],
                     ),
                   ),
+                ],
                 const SizedBox(height: AppConstants.spacingMd),
 
                 // Location
@@ -416,7 +502,7 @@ class _EventListScreenState extends State<EventListScreen> {
                 ),
                 const SizedBox(height: AppConstants.spacingMd),
 
-                // Action buttons
+                // Action buttons logic
                 if (event.isJoined)
                   // Joined state
                   Container(
@@ -448,52 +534,53 @@ class _EventListScreenState extends State<EventListScreen> {
                     ),
                   )
                 else
-                  // Not joined - show action buttons
-                  Row(
-                    children: [
-                      // Join Circle button (primary)
-                      Expanded(
-                        flex: 2,
-                        child: ElevatedButton(
-                          onPressed: () => _joinEventCircle(event),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryColor,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.circular(AppConstants.radiusSm),
+                  // Show "Join Circle" ONLY if it is a Community, as per requirement
+                  if (event.isCommunity)
+                    Row(
+                      children: [
+                        // Join Circle button (primary)
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: () => _joinEventCircle(event),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primaryColor,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius:
+                                    BorderRadius.circular(AppConstants.radiusSm),
+                              ),
+                              elevation: 0,
                             ),
-                            elevation: 0,
-                          ),
-                          child: const Text(
-                            'Join Circle',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: AppConstants.spacingSm),
-                      // Not interested button
-                      Expanded(
-                        child: TextButton(
-                          onPressed: () => _dismissEvent(event),
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppTheme.textSecondary,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                          child: const Text(
-                            'Not interested',
-                            style: TextStyle(
-                              fontSize: 13,
+                            child: const Text(
+                              'Join Circle',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
+                        const SizedBox(width: AppConstants.spacingSm),
+                        // Not interested button
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => _dismissEvent(event),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppTheme.textSecondary,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            child: const Text(
+                              'Not interested',
+                              style: TextStyle(
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
 
                 // Bottom action links
                 const SizedBox(height: AppConstants.spacingSm),
@@ -595,7 +682,7 @@ class _EventListScreenState extends State<EventListScreen> {
             ),
             const SizedBox(height: AppConstants.spacingLg),
             Text(
-              'No Matching Events',
+              'No $_selectedTab${_selectedTab == 'community' ? 'ies' : 's'} found',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
@@ -604,7 +691,7 @@ class _EventListScreenState extends State<EventListScreen> {
             ),
             const SizedBox(height: AppConstants.spacingSm),
             Text(
-              'Create a task and your assistant will find relevant event circles',
+              'Create a task or add a new one!',
               style: TextStyle(
                 fontSize: 14,
                 color: AppTheme.textSecondary,

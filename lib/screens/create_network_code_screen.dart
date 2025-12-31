@@ -193,7 +193,7 @@ class _CreateNetworkCodeScreenState extends State<CreateNetworkCodeScreen> {
                           _autoConnect = value;
                         });
                       },
-                      activeThumbColor: AppTheme.primaryColor,
+                      activeColor: AppTheme.primaryColor,
                     ),
                   ],
                 ),

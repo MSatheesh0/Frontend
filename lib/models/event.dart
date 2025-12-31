@@ -19,6 +19,9 @@ class Event {
   final int? matchPercentage; // 0-100
   final bool isPrimaryRecommendation; // Top curated vs "other circles"
   final List<String> attendees; // List of user IDs who joined
+  final bool isEvent;
+  final bool isCommunity;
+  final bool isVerified; // Verified by admin
   final bool isDismissed; // User marked "Not interested"
 
   Event({
@@ -29,6 +32,9 @@ class Event {
     required this.dateTime,
     required this.location,
     this.imageUrl,
+    this.isEvent = true,
+    this.isCommunity = false,
+    this.isVerified = false,
     this.isJoined = false,
     this.attendees = const [],
     this.photos = const [],
@@ -49,6 +55,9 @@ class Event {
     DateTime? dateTime,
     String? location,
     String? imageUrl,
+    bool? isEvent,
+    bool? isCommunity,
+    bool? isVerified,
     bool? isJoined,
     List<String>? attendees,
     List<String>? photos,
@@ -68,6 +77,9 @@ class Event {
       dateTime: dateTime ?? this.dateTime,
       location: location ?? this.location,
       imageUrl: imageUrl ?? this.imageUrl,
+      isEvent: isEvent ?? this.isEvent,
+      isCommunity: isCommunity ?? this.isCommunity,
+      isVerified: isVerified ?? this.isVerified,
       isJoined: isJoined ?? this.isJoined,
       attendees: attendees ?? this.attendees,
       photos: photos ?? this.photos,

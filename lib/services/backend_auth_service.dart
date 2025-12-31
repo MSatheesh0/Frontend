@@ -12,6 +12,7 @@ class BackendAuthService {
   final _storage = const FlutterSecureStorage();
   
   static const String _tokenKey = 'auth_token';
+  static const String _refreshTokenKey = 'refresh_token';
   static const String _userKey = 'user_data';
 
   // Request OTP
@@ -21,6 +22,7 @@ class BackendAuthService {
         ApiConfig.requestOtpEndpoint,
         body: {'email': email},
       );
+      print('✅ OTP requested for: $email');
       return true;
     } catch (e) {
       print('Request OTP failed: $e');
@@ -39,11 +41,16 @@ class BackendAuthService {
         },
       );
 
-      final token = response['token'];
+      final accessToken = response['accessToken'];
+      final refreshToken = response['refreshToken'];
       final user = response['user'];
 
-      if (token != null) {
-        await _storage.write(key: _tokenKey, value: token);
+      if (accessToken != null) {
+        await _storage.write(key: _tokenKey, value: accessToken);
+      }
+      
+      if (refreshToken != null) {
+        await _storage.write(key: _refreshTokenKey, value: refreshToken);
       }
       
       if (user != null) {
@@ -53,7 +60,7 @@ class BackendAuthService {
       return {
         'user': user,
         'isNewUser': response['isNewUser'] ?? false,
-        'token': token,
+        'token': accessToken,
       };
     } catch (e) {
       print('Verify OTP failed: $e');
@@ -63,7 +70,9 @@ class BackendAuthService {
 
   // Logout
   Future<void> logout() async {
+    // Optionally call backend logout endpoint here
     await _storage.delete(key: _tokenKey);
+    await _storage.delete(key: _refreshTokenKey);
     await _storage.delete(key: _userKey);
   }
 

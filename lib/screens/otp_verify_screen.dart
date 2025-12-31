@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../models/user.dart';
 import '../services/app_state.dart';
 import 'main_screen.dart';
+import '../services/api_client.dart';
 
 /// Screen for entering and verifying OTP
 /// Handles both new user signup and existing user signin
@@ -98,12 +99,82 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: Colors.red,
-        ),
-      );
+      // Handle 409 Conflict (Concurrent Login)
+      if (e is ApiException && e.statusCode == 409) {
+        final shouldForceLogin = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Already Logged In'),
+            content: const Text(
+                'You are currently logged in on another device. Do you want to end that session and log in here?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text(
+                  'Log in Here',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+        );
+
+        if (shouldForceLogin == true && mounted) {
+           setState(() => _isLoading = true);
+           try {
+             // Retry with force logout
+             final result = await widget.authService.verifyOtp(
+               widget.email, 
+               otp, 
+               logoutFromOtherDevices: true
+             );
+             
+             // ... Success Logic (duplicated for now, or extracted to method) ...
+             if (!mounted) return;
+             final user = result['user'] as Map<String, dynamic>;
+             final isNewUser = result['isNewUser'] as bool;
+             if (mounted) {
+               final userModel = User.fromMap(user);
+               Provider.of<AppState>(context, listen: false).setUser(userModel);
+             }
+             if (isNewUser) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => SignupDetailsScreen(
+                      email: widget.email,
+                      authService: widget.authService,
+                    ),
+                  ),
+                );
+             } else {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const MainScreen()),
+                  (route) => false,
+                );
+             }
+             return; // Done
+           } catch (retryError) {
+              if(!mounted) return;
+               ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Force login failed: ${retryError.toString()}'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+           }
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

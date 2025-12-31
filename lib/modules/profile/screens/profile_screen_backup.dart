@@ -210,7 +210,7 @@ class _ProfileScreenBackupState extends State<ProfileScreenBackup> {
                                     });
                                     setState(() {});
                                   },
-                                  activeThumbColor: AppTheme.primaryColor,
+                                  activeColor: AppTheme.primaryColor,
                                 ),
                               ],
                             ),

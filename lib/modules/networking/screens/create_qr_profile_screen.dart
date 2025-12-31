@@ -205,7 +205,7 @@ class _CreateQrProfileScreenState extends State<CreateQrProfileScreen> {
                           _autoConnect = value;
                         });
                       },
-                      activeThumbColor: AppTheme.primaryColor,
+                      activeColor: AppTheme.primaryColor,
                     ),
                   ],
                 ),

@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import '../utils/theme.dart';
 import 'package:provider/provider.dart';
 import 'dashboard_screen.dart';
 import 'assistant_screen.dart';
 import 'event_list_screen.dart';
+import 'edit_profile_screen.dart';
+import '../services/api_client.dart';
+import '../services/auth_service.dart';
 import '../services/app_state.dart';
+import 'email_input_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -36,6 +41,24 @@ class _MainScreenState extends State<MainScreen> {
         });
       }
     });
+
+    // Listen for session expiry (global logout trigger)
+    ApiClient.sessionExpiredController.stream.listen((_) {
+       print('⚠️ Session expired received in MainScreen. Logging out...');
+       _handleSessionExpiry();
+    });
+  }
+
+  void _handleSessionExpiry() async {
+    if (!mounted) return;
+    final authService = Provider.of<AuthService>(context, listen: false);
+    await authService.signOut(); // Clear tokens
+    
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const EmailInputScreen()),
+      (route) => false,
+    );
   }
 
   @override
@@ -51,10 +74,22 @@ class _MainScreenState extends State<MainScreen> {
           });
         }
 
+        // Check profile completeness
+        final user = appState.currentUser;
+        final isProfileComplete = _isProfileComplete(user);
+
         return Scaffold(
-          body: IndexedStack(
-            index: _currentIndex,
-            children: _screens,
+          body: Column(
+             children: [
+                if (user != null && !isProfileComplete)
+                   _buildCompletionBanner(context, user),
+                Expanded(
+                  child: IndexedStack(
+                    index: _currentIndex,
+                    children: _screens,
+                  ),
+                ),
+             ],
           ),
           bottomNavigationBar: Container(
             decoration: BoxDecoration(
@@ -88,13 +123,62 @@ class _MainScreenState extends State<MainScreen> {
                 BottomNavigationBarItem(
                   icon: Icon(Icons.event_outlined),
                   activeIcon: Icon(Icons.event),
-                  label: 'Events',
+                  label: 'Circles',
                 ),
               ],
             ),
           ),
         );
       },
+    );
+  }
+
+  bool _isProfileComplete(dynamic user) {
+     if (user == null) return false;
+     
+     // Debug profile status
+     bool nameOk = user.name != null && user.name!.isNotEmpty;
+     bool roleOk = user.role != null && user.role!.isNotEmpty;
+     bool companyOk = user.company != null && user.company!.isNotEmpty;
+     bool locationOk = user.location != null && user.location!.isNotEmpty;
+     bool bioOk = (user.oneLiner != null && user.oneLiner!.isNotEmpty) || 
+                  (user.bio != null && user.bio!.isNotEmpty);
+                  
+     // print('🔍 Profile Check: Name=$nameOk, Role=$roleOk, Co=$companyOk, Loc=$locationOk, Bio=$bioOk');
+     
+     if (!nameOk) return false;
+     if (!roleOk) return false;
+     if (!companyOk) return false;
+     if (!locationOk) return false;
+     if (!bioOk) return false;
+         
+     return true;
+  }
+
+  Widget _buildCompletionBanner(BuildContext context, dynamic user) {
+    return SafeArea(
+      bottom: false, // Only top is needed usually for top banner
+      child: MaterialBanner(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        content: const Text(
+          'Complete your profile to get personalized event recommendations!',
+          style: TextStyle(fontSize: 13),
+        ),
+        leading: const Icon(Icons.info_outline, color: AppTheme.primaryColor, size: 24),
+        backgroundColor: Colors.amber.shade50,
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+              );
+              // The AppState should already be updated by EditProfileScreen,
+              // triggering a rebuild of this widget via Consumer.
+            },
+            child: const Text('COMPLETE NOW', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
     );
   }
 }

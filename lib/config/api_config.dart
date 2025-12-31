@@ -53,6 +53,6 @@ class ApiConfig {
   static const String followingsEndpoint = '/followings';
 
   /// Timeout durations
-  static const Duration requestTimeout = Duration(seconds: 30);
+  static const Duration requestTimeout = Duration(seconds: 90);
   static const Duration connectionTimeout = Duration(seconds: 10);
 }

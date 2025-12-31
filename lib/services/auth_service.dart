@@ -14,6 +14,7 @@ class AuthService {
   final _apiClient = ApiClient();
   
   static const String _tokenKey = 'auth_token';
+  static const String _refreshTokenKey = 'refresh_token';
   static const String _userKey = 'user_data';
 
   Map<String, dynamic>? _currentUser;
@@ -43,30 +44,36 @@ class AuthService {
   }
 
   /// Verify OTP and Sign In
-  Future<Map<String, dynamic>> verifyOtp(String email, String otp) async {
+  Future<Map<String, dynamic>> verifyOtp(String email, String otp, {bool logoutFromOtherDevices = false}) async {
     try {
       final response = await _apiClient.post(
         ApiConfig.verifyOtpEndpoint,
         body: {
           'email': email,
           'otp': otp,
+          if (logoutFromOtherDevices) 'logoutFromOtherDevices': true,
         },
       );
 
-      final token = response['token'];
+      final accessToken = response['accessToken'];
+      final refreshToken = response['refreshToken'];
       final user = response['user'];
       final isNewUser = response['isNewUser'] == true;
 
-      if (token == null || user == null) {
+      // Handle successful login
+      if (accessToken == null || user == null) {
         throw Exception('Invalid response from server');
       }
 
       // Create session
-      _authToken = token;
+      _authToken = accessToken;
       _currentUser = Map<String, dynamic>.from(user);
 
       // Save to secure storage
       await _secureStorage.write(key: _tokenKey, value: _authToken);
+      if (refreshToken != null) {
+        await _secureStorage.write(key: _refreshTokenKey, value: refreshToken);
+      }
       await _secureStorage.write(key: _userKey, value: jsonEncode(_currentUser));
 
       print('✅ Signed in: ${user['email']} (New User: $isNewUser)');
@@ -128,6 +135,25 @@ class AuthService {
     throw Exception('Please use OTP authentication');
   }
 
+  /// Fetch latest user profile from backend
+  Future<Map<String, dynamic>> fetchUserProfile() async {
+    if (_authToken == null) throw Exception('No user logged in');
+    
+    try {
+      final user = await _apiClient.get(ApiConfig.userProfileEndpoint);
+      if (user != null) {
+        _currentUser = Map<String, dynamic>.from(user);
+        await _secureStorage.write(key: _userKey, value: jsonEncode(_currentUser));
+        print('✅ User profile fetched and updated');
+        return _currentUser!;
+      }
+      throw Exception('Empty response');
+    } catch (e) {
+      print('❌ Fetch profile failed: $e');
+      rethrow;
+    }
+  }
+
   /// Update user profile
   Future<Map<String, dynamic>> updateUserProfile(Map<String, dynamic> updates) async {
     if (_authToken == null) {
@@ -160,6 +186,7 @@ class AuthService {
     _authToken = null;
 
     await _secureStorage.delete(key: _tokenKey);
+    await _secureStorage.delete(key: _refreshTokenKey);
     await _secureStorage.delete(key: _userKey);
 
     print('✅ User signed out');
@@ -194,6 +221,7 @@ class AuthService {
     } catch (e) {
       print('⚠️  Failed to restore session: $e');
       await _secureStorage.delete(key: _tokenKey);
+      await _secureStorage.delete(key: _refreshTokenKey);
       await _secureStorage.delete(key: _userKey);
       return false;
     }

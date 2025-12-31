@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:convert';
 import '../models/event.dart';
 import '../services/networking_service.dart';
 import '../utils/theme.dart';
@@ -26,7 +28,13 @@ class _AddEventScreenState extends State<AddEventScreen> {
   DateTime _selectedDateTime = DateTime.now().add(const Duration(days: 7));
   List<String> _selectedPhotos = [];
   List<String> _selectedVideos = [];
+  bool _isEvent = true;
+  bool _isCommunity = false;
   bool _isLoading = false;
+  
+  // PDF file (only for events)
+  String? _selectedPdfBase64;
+  String? _selectedPdfName;
 
   @override
   void dispose() {
@@ -37,6 +45,8 @@ class _AddEventScreenState extends State<AddEventScreen> {
     _tagsController.dispose();
     super.dispose();
   }
+
+  // ... (keep existing helper methods)
 
   Future<void> _pickImages() async {
     try {
@@ -63,6 +73,29 @@ class _AddEventScreenState extends State<AddEventScreen> {
       }
     } catch (e) {
       _showError('Failed to pick video: $e');
+    }
+  }
+
+  Future<void> _pickPdf() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+      );
+
+      if (result != null && result.files.single.bytes != null) {
+        final bytes = result.files.single.bytes!;
+        final base64Pdf = base64Encode(bytes);
+        
+        setState(() {
+          _selectedPdfBase64 = 'data:application/pdf;base64,$base64Pdf';
+          _selectedPdfName = result.files.single.name;
+        });
+        
+        print('📄 PDF selected: ${result.files.single.name} (${bytes.length} bytes)');
+      }
+    } catch (e) {
+      _showError('Failed to pick PDF: $e');
     }
   }
 
@@ -135,20 +168,28 @@ class _AddEventScreenState extends State<AddEventScreen> {
         photos: _selectedPhotos,
         videos: _selectedVideos,
         tags: tags,
+        isEvent: _isEvent,
+        isCommunity: _isCommunity,
+        pdfFile: (_isEvent && _selectedPdfBase64 != null) ? _selectedPdfBase64 : null,
       );
+      
+      print('🚀🚀🚀 FRONTEND: Sending Create Event Request 🚀🚀🚀');
+      print('   - isEvent: $_isEvent (type: ${_isEvent.runtimeType})');
+      print('   - isCommunity: $_isCommunity (type: ${_isCommunity.runtimeType})');
+      print('   - Expected: Event=${_isEvent ? "YES" : "NO"}, Community=${_isCommunity ? "YES" : "NO"}');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Event created! Waiting for admin verification'),
+           SnackBar(
+            content: Text('✅ ${_isEvent ? 'Event' : 'Community'} created! Waiting for admin verification'),
             backgroundColor: AppTheme.successColor,
-            duration: Duration(seconds: 3),
+            duration: const Duration(seconds: 3),
           ),
         );
         Navigator.pop(context, true); // Return true to indicate success
       }
     } catch (e) {
-      _showError('Failed to create event: $e');
+      _showError('Failed to create ${_isEvent ? 'Event' : 'Community'}: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -182,7 +223,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Create Event',
+          'Create New',
           style: TextStyle(
             color: AppTheme.textPrimary,
             fontWeight: FontWeight.w600,
@@ -218,8 +259,89 @@ class _AddEventScreenState extends State<AddEventScreen> {
         child: ListView(
           padding: const EdgeInsets.all(AppConstants.spacingLg),
           children: [
+            // Type Toggles
+            Row(
+              children: [
+                // Event Toggle
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Event',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                        Switch(
+                          value: _isEvent,
+                          activeColor: AppTheme.primaryColor,
+                          onChanged: (value) {
+                            if (value) {
+                              setState(() {
+                                _isEvent = true;
+                                _isCommunity = false;
+                              });
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                
+                // Community Toggle
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Community',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                        Switch(
+                          value: _isCommunity,
+                          activeColor: AppTheme.primaryColor,
+                          onChanged: (value) {
+                            if (value) {
+                              setState(() {
+                                _isCommunity = true;
+                                _isEvent = false;
+                              });
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppConstants.spacingLg),
+
             // Event Name
-            _buildSectionLabel('Event Name', required: true),
+            _buildSectionLabel(_isEvent ? 'Event Name' : 'Community Name', required: true),
             const SizedBox(height: AppConstants.spacingSm),
             TextFormField(
               controller: _nameController,
@@ -285,37 +407,39 @@ class _AddEventScreenState extends State<AddEventScreen> {
             ),
             const SizedBox(height: AppConstants.spacingLg),
 
-            // Date & Time
-            _buildSectionLabel('Date & Time', required: true),
-            const SizedBox(height: AppConstants.spacingSm),
-            InkWell(
-              onTap: _selectDateTime,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(AppConstants.radiusSm),
-                  border: Border.all(color: Colors.grey[300]!),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.calendar_today, color: AppTheme.primaryColor),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        '${_selectedDateTime.day}/${_selectedDateTime.month}/${_selectedDateTime.year} at ${_selectedDateTime.hour.toString().padLeft(2, '0')}:${_selectedDateTime.minute.toString().padLeft(2, '0')}',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: AppTheme.textPrimary,
+            // Date & Time (Only for Events, not Communities)
+            if (_isEvent) ...[
+              _buildSectionLabel('Date & Time', required: true),
+              const SizedBox(height: AppConstants.spacingSm),
+              InkWell(
+                onTap: _selectDateTime,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(AppConstants.radiusSm),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.calendar_today, color: AppTheme.primaryColor),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          '${_selectedDateTime.day}/${_selectedDateTime.month}/${_selectedDateTime.year} at ${_selectedDateTime.hour.toString().padLeft(2, '0')}:${_selectedDateTime.minute.toString().padLeft(2, '0')}',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: AppTheme.textPrimary,
+                          ),
                         ),
                       ),
-                    ),
-                    Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
-                  ],
+                      Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: AppConstants.spacingLg),
+              const SizedBox(height: AppConstants.spacingLg),
+            ],
 
             // Images
             _buildSectionLabel('Images'),
@@ -423,6 +547,65 @@ class _AddEventScreenState extends State<AddEventScreen> {
               ),
             ),
             const SizedBox(height: AppConstants.spacingLg),
+
+            // PDF Upload (Only for Events, not Communities)
+            if (_isEvent) ...[
+              _buildSectionLabel('Event Details PDF (Optional)'),
+              const SizedBox(height: AppConstants.spacingSm),
+              
+              if (_selectedPdfName != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green[300]!),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.picture_as_pdf, color: Colors.red),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _selectedPdfName!,
+                          style: const TextStyle(fontSize: 14),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 20),
+                        onPressed: () {
+                          setState(() {
+                            _selectedPdfBase64 = null;
+                            _selectedPdfName = null;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppConstants.spacingSm),
+              ],
+              
+              OutlinedButton.icon(
+                onPressed: _pickPdf,
+                icon: const Icon(Icons.upload_file),
+                label: Text(_selectedPdfName == null ? 'Upload PDF' : 'Replace PDF'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+              const SizedBox(height: AppConstants.spacingSm),
+              Text(
+                'Upload a PDF with event details for better AI-powered recommendations',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              const SizedBox(height: AppConstants.spacingLg),
+            ],
 
             // Tags
             _buildSectionLabel('Tags'),

@@ -719,6 +719,9 @@ class NetworkingService {
     List<String> videos = const [],
     List<String> tags = const [],
     String? createdBy,
+    bool isEvent = true,
+    bool isCommunity = false,
+    String? pdfFile, // Base64 encoded PDF (only for events)
   }) async {
     if (ApiConfig.useMockAuth) {
       return {
@@ -731,6 +734,8 @@ class NetworkingService {
         'photos': photos,
         'videos': videos,
         'tags': tags,
+        'isEvent': isEvent,
+        'isCommunity': isCommunity,
         'createdBy': createdBy ?? 'mock_user',
       };
     }
@@ -745,6 +750,9 @@ class NetworkingService {
         'photos': photos,
         'videos': videos,
         'tags': tags,
+        'isEvent': isEvent,
+        'isCommunity': isCommunity,
+        if (pdfFile != null) 'pdfFile': pdfFile, // Only include if provided
       };
 
       final response = await _apiClient.post('/events', body: body);
@@ -805,22 +813,19 @@ class NetworkingService {
     }
   }
 
-  /// Join an event (Event Connections)
+  /// Join an event
   Future<Map<String, dynamic>> joinEvent({
     required String eventId,
-    required String participantId,
+    String? participantId, // Optional/Unused as backend uses token
   }) async {
     if (ApiConfig.useMockAuth) {
       return {'success': true, 'message': 'Joined mock event'};
     }
 
     try {
-      final body = {
-        'eventId': eventId,
-        'participantId': participantId,
-      };
-
-      final response = await _apiClient.post('/event-connections/join', body: body);
+      // Backend Endpoint: POST /events/:id/join
+      // Logic: Adds req.user.userId to event attendees w/ AuthMiddleware
+      final response = await _apiClient.post('/events/$eventId/join');
       print('✅ Joined event: $eventId');
       return response;
     } catch (e) {
@@ -843,6 +848,41 @@ class NetworkingService {
       rethrow;
     }
   }
+
+  /// Ask Event Assistant a question about a specific event
+  Future<Map<String, dynamic>> askEventAssistant({
+    required String eventId,
+    required String question,
+    List<Map<String, dynamic>>? conversationHistory,
+  }) async {
+    if (ApiConfig.useMockAuth) {
+      return {
+        'question': question,
+        'answer': 'This is a mock answer to your question about the event.',
+        'relevantInfo': ['Mock info 1', 'Mock info 2'],
+        'confidence': 85,
+        'suggestedQuestions': [
+          'What will I learn?',
+          'Who should attend?',
+        ]
+      };
+    }
+
+    try {
+      final body = {
+        'question': question,
+        if (conversationHistory != null) 'conversationHistory': conversationHistory,
+      };
+
+      final response = await _apiClient.post('/events/$eventId/assistant', body: body);
+      print('✅ Event Assistant answered question about event: $eventId');
+      return response['data'];
+    } catch (e) {
+      print('❌ Event Assistant failed: $e');
+      rethrow;
+    }
+  }
+
 
   /// Get all events
   Future<List<Map<String, dynamic>>> getAllEvents() async {

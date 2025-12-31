@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/app_state.dart';
 import '../models/recommendation.dart';
+import '../models/user.dart';
 import '../utils/theme.dart';
 import '../utils/recommendation_handler.dart';
 import '../widgets/networking_mode_view_new.dart';
@@ -50,7 +51,7 @@ class DashboardScreen extends StatelessWidget {
                   Switch(
                     value: appState.isNetworkingMode,
                     onChanged: (value) => appState.setNetworkingMode(value),
-                    activeThumbColor: AppTheme.primaryColor,
+                    activeColor: AppTheme.primaryColor,
                   ),
                   const SizedBox(width: AppConstants.spacingSm),
                 ],
@@ -63,20 +64,24 @@ class DashboardScreen extends StatelessWidget {
         builder: (context, appState, child) {
           // Show networking mode if enabled
           if (appState.isNetworkingMode) {
-            return const NetworkingModeView();
+             return const NetworkingModeView();
           }
 
           // Show scanner mode if enabled
           if (appState.isScannerMode) {
             return _buildScannerMode(context);
           }
-
-          // Show dashboard based on goal status
+          
+          Widget content;
           if (!appState.hasActiveGoal) {
-            return _buildEmptyState(context);
+            content = _buildEmptyState(context);
+          } else {
+            content = _buildActiveGoalState(context, appState);
           }
 
-          return _buildActiveGoalState(context, appState);
+
+          
+          return content;
         },
       ),
       floatingActionButton: Consumer<AppState>(
@@ -355,4 +360,6 @@ class DashboardScreen extends StatelessWidget {
   void _handleScan(BuildContext context, String code) {
     // Not used on web
   }
+
+
 }

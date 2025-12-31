@@ -50,7 +50,7 @@ class DashboardScreen extends StatelessWidget {
                   Switch(
                     value: appState.isNetworkingMode,
                     onChanged: (value) => appState.setNetworkingMode(value),
-                    activeThumbColor: AppTheme.primaryColor,
+                    activeColor: AppTheme.primaryColor,
                   ),
                   const SizedBox(width: AppConstants.spacingSm),
                 ],

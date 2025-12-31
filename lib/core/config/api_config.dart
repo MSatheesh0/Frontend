@@ -8,7 +8,7 @@ class ApiConfig {
   /// Local development: 'http://localhost:3000'
   /// Dev tunnel: 'https://cpt4x27j-3000.inc1.devtunnels.ms'
   /// Production: Update with your production API URL
-  static const String baseUrl = 'https://cpt4x27j-3000.inc1.devtunnels.ms';
+  static const String baseUrl = 'https://waytree-bc.onrender.com';
 
   /// API endpoints
   static const String requestOtpEndpoint = '/auth/request-otp';

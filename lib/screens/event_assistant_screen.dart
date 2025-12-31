@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/event.dart';
 import '../utils/theme.dart';
+import '../services/networking_service.dart';
 
 class EventAssistantScreen extends StatefulWidget {
   final Event event;
@@ -18,6 +19,8 @@ class _EventAssistantScreenState extends State<EventAssistantScreen> {
   final List<ChatMessage> _messages = [];
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final NetworkingService _networkingService = NetworkingService();
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -30,7 +33,7 @@ class _EventAssistantScreenState extends State<EventAssistantScreen> {
     _sendMessage(question);
   }
 
-  void _sendMessage(String text) {
+  void _sendMessage(String text) async {
     if (text.trim().isEmpty) return;
 
     final userMessage = ChatMessage(
@@ -42,22 +45,46 @@ class _EventAssistantScreenState extends State<EventAssistantScreen> {
 
     setState(() {
       _messages.add(userMessage);
+      _isLoading = true;
     });
 
     _textController.clear();
 
-    // Simulate assistant response
-    Future.delayed(const Duration(milliseconds: 500), () {
-      final assistantReply = getEventAssistantReply(text, widget.event);
+    // Auto-scroll to bottom
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+
+    try {
+      // Call real backend API
+      final conversationHistory = _messages.map((msg) => {
+        'role': msg.isUser ? 'user' : 'assistant',
+        'content': msg.text,
+        'timestamp': msg.timestamp.toIso8601String(),
+      }).toList();
+
+      final response = await _networkingService.askEventAssistant(
+        eventId: widget.event.id,
+        question: text,
+        conversationHistory: conversationHistory,
+      );
+
       final assistantMessage = ChatMessage(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         isUser: false,
-        text: assistantReply,
+        text: response['answer'] ?? 'Sorry, I couldn\'t process that question.',
         timestamp: DateTime.now(),
       );
 
       setState(() {
         _messages.add(assistantMessage);
+        _isLoading = false;
       });
 
       // Auto-scroll to bottom
@@ -70,7 +97,23 @@ class _EventAssistantScreenState extends State<EventAssistantScreen> {
           );
         }
       });
-    });
+    } catch (e) {
+      print('❌ Event Assistant error: $e');
+      
+      // Fallback to static response on error
+      final assistantReply = getEventAssistantReply(text, widget.event);
+      final assistantMessage = ChatMessage(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        isUser: false,
+        text: assistantReply,
+        timestamp: DateTime.now(),
+      );
+
+      setState(() {
+        _messages.add(assistantMessage);
+        _isLoading = false;
+      });
+    }
   }
 
   @override
