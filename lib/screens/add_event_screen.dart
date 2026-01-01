@@ -7,7 +7,8 @@ import '../services/networking_service.dart';
 import '../utils/theme.dart';
 
 class AddEventScreen extends StatefulWidget {
-  const AddEventScreen({super.key});
+  final Event? event;
+  const AddEventScreen({super.key, this.event});
 
   @override
   State<AddEventScreen> createState() => _AddEventScreenState();
@@ -35,6 +36,24 @@ class _AddEventScreenState extends State<AddEventScreen> {
   // PDF file (only for events)
   String? _selectedPdfBase64;
   String? _selectedPdfName;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.event != null) {
+      _nameController.text = widget.event!.name;
+      _headlineController.text = widget.event!.headline ?? '';
+      _descriptionController.text = widget.event!.description;
+      _locationController.text = widget.event!.location;
+      _tagsController.text = widget.event!.tags.join(', ');
+      _selectedDateTime = widget.event!.dateTime;
+      _isEvent = widget.event!.isEvent;
+      _isCommunity = widget.event!.isCommunity;
+      // Note: We don't populate photos/videos/pdf here as they are paths or base64
+      // and might need different handling if we want to show existing ones.
+      // For now, we'll focus on text fields and basic flags.
+    }
+  }
 
   @override
   void dispose() {
@@ -156,32 +175,40 @@ class _AddEventScreenState extends State<AddEventScreen> {
           .where((tag) => tag.isNotEmpty)
           .toList();
 
-      // Create event
-      await _networkingService.createEvent(
-        name: _nameController.text.trim(),
-        headline: _headlineController.text.trim().isEmpty 
-            ? null 
-            : _headlineController.text.trim(),
-        description: _descriptionController.text.trim(),
-        dateTime: _selectedDateTime,
-        location: _locationController.text.trim(),
-        photos: _selectedPhotos,
-        videos: _selectedVideos,
-        tags: tags,
-        isEvent: _isEvent,
-        isCommunity: _isCommunity,
-        pdfFile: (_isEvent && _selectedPdfBase64 != null) ? _selectedPdfBase64 : null,
-      );
+      if (widget.event != null) {
+        // Update existing event
+        await _networkingService.updateEvent(
+          eventId: widget.event!.id,
+          name: _nameController.text.trim(),
+          headline: _headlineController.text.trim().isEmpty ? null : _headlineController.text.trim(),
+          description: _descriptionController.text.trim(),
+          dateTime: _selectedDateTime,
+          location: _locationController.text.trim(),
+          tags: tags,
+        );
+      } else {
+        // Create new event
+        await _networkingService.createEvent(
+          name: _nameController.text.trim(),
+          headline: _headlineController.text.trim().isEmpty 
+              ? null 
+              : _headlineController.text.trim(),
+          description: _descriptionController.text.trim(),
+          dateTime: _selectedDateTime,
+          location: _locationController.text.trim(),
+          photos: _selectedPhotos,
+          videos: _selectedVideos,
+          tags: tags,
+          isEvent: _isEvent,
+          isCommunity: _isCommunity,
+          pdfFile: (_isEvent && _selectedPdfBase64 != null) ? _selectedPdfBase64 : null,
+        );
+      }
       
-      print('🚀🚀🚀 FRONTEND: Sending Create Event Request 🚀🚀🚀');
-      print('   - isEvent: $_isEvent (type: ${_isEvent.runtimeType})');
-      print('   - isCommunity: $_isCommunity (type: ${_isCommunity.runtimeType})');
-      print('   - Expected: Event=${_isEvent ? "YES" : "NO"}, Community=${_isCommunity ? "YES" : "NO"}');
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
            SnackBar(
-            content: Text('✅ ${_isEvent ? 'Event' : 'Community'} created! Waiting for admin verification'),
+            content: Text('✅ ${widget.event != null ? 'Updated' : 'Created'} successfully!'),
             backgroundColor: AppTheme.successColor,
             duration: const Duration(seconds: 3),
           ),
@@ -189,7 +216,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
         Navigator.pop(context, true); // Return true to indicate success
       }
     } catch (e) {
-      _showError('Failed to create ${_isEvent ? 'Event' : 'Community'}: $e');
+      _showError('Failed to ${widget.event != null ? 'update' : 'create'}: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -222,9 +249,9 @@ class _AddEventScreenState extends State<AddEventScreen> {
           icon: const Icon(Icons.close, color: AppTheme.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Create New',
-          style: TextStyle(
+        title: Text(
+          widget.event != null ? 'Edit Event' : 'Create New',
+          style: const TextStyle(
             color: AppTheme.textPrimary,
             fontWeight: FontWeight.w600,
           ),

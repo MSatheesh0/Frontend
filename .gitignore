@@ -1,3 +1,21 @@
 node_modules/ 
 .env 
 dist 
+
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+
+# Build outputs
+build/
+
+# Platform generated files
+linux/flutter/generated_*
+macos/Flutter/GeneratedPluginRegistrant.swift
+windows/flutter/generated_*
+
+# IDE
+.vscode/
+.idea/

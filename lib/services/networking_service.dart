@@ -950,8 +950,8 @@ class NetworkingService {
   }
 
 
-  /// Get all events
-  Future<List<Map<String, dynamic>>> getAllEvents() async {
+  /// Get all events with optional filtering
+  Future<List<Map<String, dynamic>>> getAllEvents({bool? my, bool? all}) async {
     if (ApiConfig.useMockAuth) {
       return [
         {
@@ -964,41 +964,84 @@ class NetworkingService {
           'photos': [],
           'tags': ['Tech', 'Networking'],
           'createdBy': {'name': 'Mock Organizer'},
+          'isEvent': true,
+          'isCommunity': false,
+          'isVerified': true,
         }
       ];
     }
 
     try {
-      print('📥 Fetching all events from backend...');
-      final response = await _apiClient.get('/events');
-      print('📦 Events response type: ${response.runtimeType}');
+      String url = '/events';
+      final params = <String>[];
+      if (my == true) params.add('my=true');
+      if (all == true) params.add('all=true');
+      
+      if (params.isNotEmpty) {
+        url += '?${params.join('&')}';
+      }
+
+      print('📥 Fetching events from: $url');
+      final response = await _apiClient.get(url);
       
       if (response is Map<String, dynamic> && response.containsKey('data')) {
         final data = response['data'];
         if (data is List) {
-          print('✅ Got ${data.length} events from wrapped response');
-          if (data.isNotEmpty) {
-            print('   First event keys: ${data[0].keys.toList()}');
-            print('   First event _id: ${data[0]['_id']}');
-            print('   First event id: ${data[0]['id']}');
-          }
           return List<Map<String, dynamic>>.from(data);
         }
       }
       
       if (response is List) {
-        print('✅ Got ${response.length} events from direct list');
-        if (response.isNotEmpty) {
-          print('   First event keys: ${response[0].keys.toList()}');
-          print('   First event _id: ${response[0]['_id']}');
-          print('   First event id: ${response[0]['id']}');
-        }
         return List<Map<String, dynamic>>.from(response);
       }
       return [];
     } catch (e) {
-      print('❌ Get all events failed: $e');
+      print('❌ Get events failed: $e');
       return [];
+    }
+  }
+
+  /// Get pending events for admin approval
+  Future<List<Map<String, dynamic>>> getPendingEvents() async {
+    if (ApiConfig.useMockAuth) return [];
+
+    try {
+      final response = await _apiClient.get('/events/admin/pending');
+      if (response is Map<String, dynamic> && response.containsKey('data')) {
+        final data = response['data'];
+        if (data is List) {
+          return List<Map<String, dynamic>>.from(data);
+        }
+      }
+      return [];
+    } catch (e) {
+      print('❌ Get pending events failed: $e');
+      return [];
+    }
+  }
+
+  /// Approve an event (Admin only)
+  Future<Map<String, dynamic>> approveEvent(String eventId) async {
+    if (ApiConfig.useMockAuth) return {'success': true};
+
+    try {
+      final response = await _apiClient.put('/events/admin/$eventId/verify');
+      return response;
+    } catch (e) {
+      print('❌ Approve event failed: $e');
+      rethrow;
+    }
+  }
+
+  /// Reject an event (Admin only)
+  Future<void> rejectEvent(String eventId) async {
+    if (ApiConfig.useMockAuth) return;
+
+    try {
+      await _apiClient.delete('/events/admin/$eventId/reject');
+    } catch (e) {
+      print('❌ Reject event failed: $e');
+      rethrow;
     }
   }
 
