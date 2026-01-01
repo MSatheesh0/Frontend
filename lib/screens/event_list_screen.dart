@@ -6,6 +6,7 @@ import '../services/networking_service.dart';
 import 'event_details_screen.dart';
 import 'event_assistant_screen.dart';
 import 'add_event_screen.dart';
+import 'event_status_screen.dart';
 import 'package:intl/intl.dart';
 import '../services/auth_service.dart';
 import 'package:provider/provider.dart';
@@ -215,6 +216,21 @@ class _EventListScreenState extends State<EventListScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.analytics_outlined, color: AppTheme.primaryColor),
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const EventStatusScreen(),
+                ),
+              );
+              if (result == true) {
+                _loadEvents();
+              }
+            },
+            tooltip: 'Event Status',
+          ),
+          IconButton(
             icon: const Icon(Icons.add_circle, color: AppTheme.primaryColor),
             onPressed: () async {
               final result = await Navigator.push(
@@ -405,6 +421,9 @@ class _EventListScreenState extends State<EventListScreen> {
                         ],
                       ),
                     ),
+                    const SizedBox(width: AppConstants.spacingSm),
+                    // Manage Circle Icon (for creator or admin)
+                    _buildManageIcon(event),
                     const SizedBox(width: AppConstants.spacingSm),
                     // Match percentage badge
                     if (event.matchPercentage != null)
@@ -645,14 +664,28 @@ class _EventListScreenState extends State<EventListScreen> {
     );
   }
 
-  Color _getMatchColor(int percentage) {
-    if (percentage >= 85) {
-      return AppTheme.successColor;
-    } else if (percentage >= 70) {
-      return const Color(0xFFF59E0B); // Amber
-    } else {
-      return AppTheme.textSecondary;
-    }
+  Widget _buildManageIcon(Event event) {
+    final user = Provider.of<AppState>(context, listen: false).currentUser;
+    final isCreator = event.createdBy == user?.id;
+    final isAdmin = user?.role == 'admin';
+
+    if (!isCreator && !isAdmin) return const SizedBox.shrink();
+
+    return IconButton(
+      icon: const Icon(Icons.settings_outlined, size: 20, color: AppTheme.primaryColor),
+      onPressed: () async {
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const EventStatusScreen(),
+          ),
+        );
+        if (result == true) _loadEvents();
+      },
+      tooltip: 'Manage Circle',
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(),
+    );
   }
 
   Widget _buildEmptyState() {
@@ -690,5 +723,11 @@ class _EventListScreenState extends State<EventListScreen> {
         ),
       ),
     );
+  }
+
+  Color _getMatchColor(int percentage) {
+    if (percentage >= 80) return const Color(0xFF10B981); // Emerald
+    if (percentage >= 60) return const Color(0xFF3B82F6); // Blue
+    return const Color(0xFFF59E0B); // Amber
   }
 }
