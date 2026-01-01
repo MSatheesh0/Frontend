@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import '../models/event.dart';
 import '../utils/theme.dart';
@@ -5,9 +6,7 @@ import '../services/networking_service.dart';
 import 'event_details_screen.dart';
 import 'event_assistant_screen.dart';
 import 'add_event_screen.dart';
-import 'add_event_screen.dart';
 import 'package:intl/intl.dart';
-// Check AuthService import
 import '../services/auth_service.dart';
 import 'package:provider/provider.dart';
 import '../services/app_state.dart';
@@ -42,22 +41,10 @@ class _EventListScreenState extends State<EventListScreen> {
         _events = eventsData.map((eventData) {
           final eventId = eventData['_id'] ?? eventData['id'] ?? '';
           
-          // Parsing with default fallbacks
-          // Note: If backend doesn't return these fields (old code running),
-          // isEvent defaults to true, isCommunity to false.
           final isEvt = eventData['isEvent'] ?? true;
           final isComm = eventData['isCommunity'] ?? false;
           final isVer = eventData['isVerified'] ?? false;
           
-          // STRICT DEBUG LOGGING
-          print('--------------------------------------------------');
-          print('EventID: $eventId');
-          print('Name: ${eventData['name']}');
-          print('Raw isEvent: ${eventData['isEvent']} -> Parsed: $isEvt');
-          print('Raw isCommunity: ${eventData['isCommunity']} -> Parsed: $isComm');
-          print('Raw isVerified: ${eventData['isVerified']} -> Parsed: $isVer');
-          print('--------------------------------------------------');
-
           return Event(
             id: eventId,
             name: eventData['name'] ?? '',
@@ -195,7 +182,7 @@ class _EventListScreenState extends State<EventListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Filter logic based on user request:
+    // Filter logic:
     // Tab "Events": Show if isEvent is true AND NOT isCommunity (Strict separation)
     // Tab "Communities": Show if isCommunity is true AND isVerified is true
     
@@ -505,7 +492,7 @@ class _EventListScreenState extends State<EventListScreen> {
                 ),
                 const SizedBox(height: AppConstants.spacingMd),
 
-                // Action buttons logic
+                // Result Action Buttons Logic
                 if (event.isJoined)
                   // Joined state
                   Container(
@@ -537,53 +524,50 @@ class _EventListScreenState extends State<EventListScreen> {
                     ),
                   )
                 else
-                  // Show "Join Circle" ONLY if it is a Community, as per requirement
-                  if (event.isCommunity)
-                    Row(
-                      children: [
-                        // Join Circle button (primary)
-                        Expanded(
-                          flex: 2,
-                          child: ElevatedButton(
-                            onPressed: () => _joinEventCircle(event),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.primaryColor,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.circular(AppConstants.radiusSm),
-                              ),
-                              elevation: 0,
+                  // SHOW JOIN BUTTON FOR EVERYONE (EVENTS + COMMUNITIES)
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton(
+                          onPressed: () => _joinEventCircle(event),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius:
+                                  BorderRadius.circular(AppConstants.radiusSm),
                             ),
-                            child: const Text(
-                              'Join Circle',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Join',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
-                        const SizedBox(width: AppConstants.spacingSm),
-                        // Not interested button
-                        Expanded(
-                          child: TextButton(
-                            onPressed: () => _dismissEvent(event),
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppTheme.textSecondary,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                            child: const Text(
-                              'Not interested',
-                              style: TextStyle(
-                                fontSize: 13,
-                              ),
+                      ),
+                      const SizedBox(width: AppConstants.spacingSm),
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => _dismissEvent(event),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppTheme.textSecondary,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: const Text(
+                            'Not interested',
+                            style: TextStyle(
+                              fontSize: 13,
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
+                  ),
 
                 // Bottom action links
                 const SizedBox(height: AppConstants.spacingSm),

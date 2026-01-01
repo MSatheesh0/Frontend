@@ -1,5 +1,7 @@
+
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'; // Import for kIsWeb
 import 'package:file_picker/file_picker.dart';
 import '../services/networking_service.dart';
 import '../utils/theme.dart';
@@ -98,38 +100,93 @@ class _EventMembersScreenState extends State<EventMembersScreen> {
   }
 
   Future<void> _uploadExcel() async {
+    print('📂 _uploadExcel started');
     try {
+      print('📂 Picking file...');
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['xlsx', 'xls'],
+        withData: true, // Critical for Web
       );
 
-      if (result != null && result.files.single.path != null) {
-        final file = File(result.files.single.path!);
-        
+      print('📂 Picker Result: ${result != null ? "Found" : "Null"}');
+
+      if (result != null) {
+        final platformFile = result.files.single;
+        print('📂 File Info - Name: ${platformFile.name}, Size: ${platformFile.size}');
+
         // Show loading
+        if (!mounted) return;
         showDialog(
           context: context,
           barrierDismissible: false,
           builder: (c) => const Center(child: CircularProgressIndicator()),
         );
 
-        await _networkingService.uploadEventMembers(
-          eventId: widget.eventId,
-          file: file,
-        );
+        try {
+          if (kIsWeb) {
+             print('🌐 Web Environment detected.');
+             print('📂 Checking bytes...');
+             if (platformFile.bytes != null) {
+                print('✅ Bytes found (${platformFile.bytes!.length}). Uploading via bytes...');
+                await _networkingService.uploadEventMembers(
+                  eventId: widget.eventId,
+                  bytes: platformFile.bytes,
+                  filename: platformFile.name,
+                );
+             } else {
+                print('❌ Web Error: Bytes are null!');
+                throw Exception('File bytes are missing on Web.');
+             }
+          } else {
+             // Native
+             print('💻 Native Environment detected.');
+             // Accessing .path on native is safe, but let's be careful
+             final filePath = platformFile.path;
+             print('📂 File Path: $filePath');
+             
+             if (filePath != null) {
+                 await _networkingService.uploadEventMembers(
+                   eventId: widget.eventId,
+                   file: File(filePath),
+                 );
+             } else {
+                 // Fallback to bytes if path is weirdly null on native (e.g. MacOS cached?)
+                 if (platformFile.bytes != null) {
+                    print('⚠️ Path null on native, but bytes found. Using bytes.');
+                    await _networkingService.uploadEventMembers(
+                      eventId: widget.eventId,
+                      bytes: platformFile.bytes,
+                      filename: platformFile.name,
+                    );
+                 } else {
+                    throw Exception('File path and bytes are both missing.');
+                 }
+             }
+          }
 
-        Navigator.pop(context); // Hide loading
-        _refreshMembers();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Members uploaded successfully')),
-        );
+          if (mounted) {
+             Navigator.pop(context); // Hide loading
+             _refreshMembers();
+             ScaffoldMessenger.of(context).showSnackBar(
+               const SnackBar(content: Text('Members uploaded successfully')),
+             );
+          }
+        } catch (uploadError) {
+          print('❌ Upload Process Error: $uploadError');
+          if (mounted) Navigator.pop(context); // Hide loading
+          throw uploadError;
+        }
+      } else {
+         print('📂 User cancelled picker');
       }
     } catch (e) {
-      Navigator.pop(context); // Hide loading if error
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Upload failed: $e')),
-      );
+      print('❌ Outer Upload Error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload failed: $e')),
+        );
+      }
     }
   }
 
@@ -186,48 +243,80 @@ class _EventMembersScreenState extends State<EventMembersScreen> {
             return const Center(child: Text('No members yet.'));
           }
 
-          // Deduplicate based on phone number
+          // Deduplicate and Normalize
+          // The backend now returns EventMember documents which have 'name' and 'phoneNumber' at the top level.
+          // This unified structure works for Join, Manual, and Excel sources.
           final uniqueMembers = <Map<String, dynamic>>[];
-          final seenPhones = <String>{};
+          final seenKeys = <String>{};
 
           for (var member in members) {
-            final participant = member['participantId'] ?? {};
-            final phone = participant['phoneNumber']?.toString() ?? '';
-            
-            if (phone.isNotEmpty) {
-              if (!seenPhones.contains(phone)) {
-                seenPhones.add(phone);
-                uniqueMembers.add(member);
-              }
-            } else {
-              // If no phone, include it (or dedupe by email/id if needed, but keeping simple)
-              uniqueMembers.add(member);
-            }
+             // 1. Try top-level name/phone directly (Prioritize EventMember logic)
+             String name = member['name']?.toString() ?? '';
+             String phone = member['phoneNumber']?.toString() ?? '';
+             
+             // 2. Fallback to older nested structure if somehow present (legacy safety)
+             if (name.isEmpty || phone.isEmpty) {
+                final participant = member['participantId'];
+                if (participant is Map<String, dynamic>) {
+                   if (name.isEmpty) name = participant['name']?.toString() ?? 'Unknown';
+                   if (phone.isEmpty) phone = participant['phoneNumber']?.toString() ?? '';
+                }
+             }
+
+             // Normalize for deduplication (Phone number based, or name if phone is missing)
+             final key = phone.isNotEmpty ? phone.replaceAll(RegExp(r'\D'), '') : name.toLowerCase();
+             
+             // If key exists and hasn't been seen, or if we want to show everything (users choice), 
+             // but user asked for "1 akash... 2 minu...", so distinct list is implied.
+             if (key.isNotEmpty && !seenKeys.contains(key)) {
+                seenKeys.add(key);
+                uniqueMembers.add({
+                  ...member,
+                  'displayName': name.isNotEmpty ? name : 'Unknown',
+                  'displayPhone': phone,
+                });
+             }
           }
+          
+          // Sort alphabetically by Name
+          uniqueMembers.sort((a, b) => 
+             (a['displayName'] as String).toLowerCase().compareTo((b['displayName'] as String).toLowerCase())
+          );
 
           return ListView.builder(
             itemCount: uniqueMembers.length,
             itemBuilder: (context, index) {
               final memberData = uniqueMembers[index];
-              final participant = (memberData['participantId'] as Map<String, dynamic>?) ?? {};
-              var name = participant['name']?.toString() ?? 'Unknown';
-              if (name.isEmpty) name = 'Unknown';
-              final email = participant['email'] ?? '';
-              final phone = participant['phoneNumber']?.toString() ?? '';
-              final photoUrl = participant['photoUrl'];
+              final name = memberData['displayName'] as String;
+              final phone = memberData['displayPhone'] as String;
+              final source = memberData['source']?.toString() ?? 'unknown';
 
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundImage: photoUrl != null && photoUrl.isNotEmpty
-                      ? NetworkImage(photoUrl)
-                      : null,
-                  child: photoUrl == null || photoUrl.isEmpty
-                      ? Text(name.substring(0, 1).toUpperCase())
-                      : null,
+              return Card(
+                elevation: 0,
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Colors.grey.withOpacity(0.2)),
                 ),
-                title: Text(name),
-                subtitle: Text(phone.isNotEmpty ? phone : email),
-                onTap: () => _showMemberDetails(participant),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                    child: Text(
+                      name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?',
+                      style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  title: Text(
+                    name,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  subtitle: Text(
+                    phone.isNotEmpty ? phone : 'No phone number',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                  trailing: _buildSourceTag(source),
+                  onTap: () => _showMemberDetailsModal(name, phone, source),
+                ),
               );
             },
           );
@@ -236,79 +325,92 @@ class _EventMembersScreenState extends State<EventMembersScreen> {
       floatingActionButton: widget.isOrganizer
           ? FloatingActionButton(
               onPressed: _showAddOptions,
+              backgroundColor: AppTheme.primaryColor,
               child: const Icon(Icons.add),
             )
           : null,
     );
   }
 
-  void _showMemberDetails(Map<String, dynamic> participant) {
-    final name = participant['name']?.toString() ?? 'Unknown';
-    final email = participant['email']?.toString() ?? 'N/A';
-    final phone = participant['phoneNumber']?.toString() ?? 'N/A';
-    final role = participant['role']?.toString() ?? 'N/A';
-    final company = participant['company']?.toString() ?? 'N/A';
-    final position = participant['position']?.toString() ?? 'N/A';
-    final photoUrl = participant['photoUrl'];
+  Widget? _buildSourceTag(String source) {
+    Color color;
+    String label;
+    
+    switch (source) {
+      case 'excel':
+        color = Colors.green;
+        label = 'Excel';
+        break;
+      case 'manual':
+        color = Colors.orange;
+        label = 'Manual';
+        break;
+      case 'join':
+        color = Colors.blue;
+        label = 'App User';
+        break;
+      default:
+        return null;
+    }
 
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  void _showMemberDetailsModal(String name, String phone, String source) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      isScrollControlled: true, // Allow full height if needed
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          left: 24.0,
-          right: 24.0,
-          top: 24.0,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 24.0,
+      builder: (c) => Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircleAvatar(
+              radius: 40,
+               backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+              child: Text(
+                name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?',
+                style: TextStyle(fontSize: 32, color: AppTheme.primaryColor),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 24),
+            _buildDetailRow(Icons.phone, 'Phone', phone.isNotEmpty ? phone : 'N/A'),
+            _buildDetailRow(Icons.source, 'Source', source.toUpperCase()),
+            const SizedBox(height: 24),
+          ],
         ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircleAvatar(
-                radius: 40,
-                backgroundImage: photoUrl != null && photoUrl.isNotEmpty
-                    ? NetworkImage(photoUrl)
-                    : null,
-                child: photoUrl == null || photoUrl.isEmpty
-                    ? Text(
-                        name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?',
-                        style: const TextStyle(fontSize: 32),
-                      )
-                    : null,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                name,
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                role,
-                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-              ),
-              const SizedBox(height: 24),
-              _buildDetailRow(Icons.phone, 'Phone', phone),
-              _buildDetailRow(Icons.email, 'Email', email),
-              _buildDetailRow(Icons.business, 'Company', company),
-              _buildDetailRow(Icons.work, 'Position', position),
-              const SizedBox(height: 24),
-            ],
-          ),
-        ),
-      ),
+      )
     );
   }
-
+  
   Widget _buildDetailRow(IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         children: [
-          Icon(icon, color: AppTheme.primaryColor, size: 20),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: AppTheme.primaryColor, size: 20),
+          ),
           const SizedBox(width: 16),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -319,7 +421,7 @@ class _EventMembersScreenState extends State<EventMembersScreen> {
               ),
               Text(
                 value,
-                style: const TextStyle(fontSize: 16),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
               ),
             ],
           ),

@@ -38,18 +38,18 @@ class User {
   
   factory User.fromMap(Map<String, dynamic> map) {
     return User(
-      id: map['id'] ?? '',
-      name: map['name'] ?? '',
-      email: map['email'] ?? '',
-      role: map['role'] ?? '',
-      company: map['company'],
-      bio: map['oneLiner'] ?? map['bio'], // Handle both fields
-      avatarUrl: map['photoUrl'] ?? map['avatarUrl'],
-      location: map['location'],
-      oneLiner: map['oneLiner'],
-      website: map['website'],
-      photoUrl: map['photoUrl'],
-      phoneNumber: map['phoneNumber'],
+      id: map['id']?.toString() ?? '',
+      name: map['name']?.toString() ?? '',
+      email: map['email']?.toString() ?? '',
+      role: map['role']?.toString() ?? '',
+      company: map['company']?.toString(), // Explicit conversion
+      bio: (map['oneLiner'] ?? map['bio'])?.toString(),
+      avatarUrl: (map['photoUrl'] ?? map['avatarUrl'])?.toString(),
+      location: map['location']?.toString(), // Explicit conversion
+      oneLiner: map['oneLiner']?.toString(),
+      website: map['website']?.toString(),
+      photoUrl: map['photoUrl']?.toString(),
+      phoneNumber: map['phoneNumber']?.toString(),
       interests: List<String>.from(map['interests'] ?? []),
     );
   }

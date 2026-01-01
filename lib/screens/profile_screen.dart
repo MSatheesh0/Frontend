@@ -7,8 +7,31 @@ import 'edit_profile_screen.dart';
 import 'email_input_screen.dart';
 
 /// Profile screen showing current user information
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  
+  @override
+  void initState() {
+    super.initState();
+    // Refresh user data when screen opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadData();
+    });
+  }
+
+  Future<void> _loadData() async {
+    try {
+      await Provider.of<AppState>(context, listen: false).refreshUser();
+    } catch (e) {
+      print('Error refreshing profile data: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,13 +50,19 @@ class ProfileScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit, color: AppTheme.primaryColor),
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              // Wait for result from Edit Screen
+              final result = await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => const EditProfileScreen(),
                 ),
               );
+              
+              // If saved, refresh data
+              if (result == true && mounted) {
+                _loadData();
+              }
             },
           ),
           IconButton(
@@ -52,6 +81,8 @@ class ProfileScreen extends StatelessWidget {
               child: Text('No user logged in'),
             );
           }
+          
+          print('📱 Profile Screen Building - Phone: ${user.phoneNumber}');
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(AppConstants.spacingLg),

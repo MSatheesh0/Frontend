@@ -1,3 +1,4 @@
+
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
@@ -33,6 +34,8 @@ class ApiClient {
     String endpoint, {
     dynamic body,
     File? file,
+    List<int>? fileBytes,
+    String? filename,
     String fieldName = 'file',
   }) async {
     int retries = 1;
@@ -43,13 +46,23 @@ class ApiClient {
 
         http.Response response;
 
-        if (file != null) {
+        if (file != null || fileBytes != null) {
           // Upload file logic
           headers.remove('Content-Type'); // Multipart sets boundary
           final request = http.MultipartRequest(method, url);
           request.headers.addAll(headers);
-          final multipartFile = await http.MultipartFile.fromPath(fieldName, file.path);
-          request.files.add(multipartFile);
+          
+          if (file != null) {
+             final multipartFile = await http.MultipartFile.fromPath(fieldName, file.path);
+             request.files.add(multipartFile);
+          } else if (fileBytes != null) {
+             final multipartFile = http.MultipartFile.fromBytes(
+               fieldName, 
+               fileBytes,
+               filename: filename ?? 'upload',
+             );
+             request.files.add(multipartFile);
+          }
           
           print('$method (Upload) $url'); // Log
           final streamed = await request.send().timeout(ApiConfig.requestTimeout);
@@ -119,7 +132,6 @@ class ApiClient {
              sessionExpiredController.add(null);
           }
         }
-        rethrow;
         rethrow;
       } catch (e) {
         throw _handleError(e);
@@ -191,8 +203,8 @@ class ApiClient {
   }
 
   // Upload file
-  Future<dynamic> uploadFile(String endpoint, File file, {String fieldName = 'file'}) {
-    return _sendRequest('POST', endpoint, file: file, fieldName: fieldName);
+  Future<dynamic> uploadFile(String endpoint, {File? file, List<int>? fileBytes, String? filename, String fieldName = 'file'}) {
+    return _sendRequest('POST', endpoint, file: file, fileBytes: fileBytes, filename: filename, fieldName: fieldName);
   }
 
   // Handle API response

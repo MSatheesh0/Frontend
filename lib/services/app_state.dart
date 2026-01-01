@@ -34,10 +34,24 @@ class AppState extends ChangeNotifier {
     _restoreNetworkModeState();
   }
 
+  Future<void> refreshUser() async {
+    print('🔄 AppState: Refreshing user data...');
+    await _initUser();
+  }
+
   Future<void> _initUser() async {
-    final authUser = AuthService().currentUser;
+    // ... same as before
+    final authUser = await AuthService().fetchUserProfile().catchError((e) {
+         print("Error fetching profile on init: $e");
+         return AuthService().currentUser; 
+    }); 
+    // Wait, AuthService().currentUser is a getter. _initUser uses it.
+    // But we should try to FETCH fresh data.
+    // AuthService has `fetchUserProfile`.
+    
     if (authUser != null) {
       _currentUser = User.fromMap(authUser);
+      print('✅ AppState: User loaded: ${_currentUser?.name}, Phone: ${_currentUser?.phoneNumber}'); // DEBUG
       await loadNetworkCodes();
       await _loadConnections();
       await _loadFollowings();
@@ -195,7 +209,9 @@ class AppState extends ChangeNotifier {
     
     try {
       final updatedUser = await AuthService().updateUserProfile(updates);
+      print('🔍 AppState received updated user: $updatedUser'); // DEBUG LOG
       _currentUser = User.fromMap(updatedUser);
+      print('🔍 AppState mapped user: ${_currentUser?.company}, ${_currentUser?.location}'); // DEBUG LOG
       notifyListeners();
       print('✅ AppState: User profile updated');
     } catch (e) {

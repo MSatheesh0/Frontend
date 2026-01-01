@@ -1,3 +1,4 @@
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -798,14 +799,12 @@ class NetworkingService {
       if (photos != null) body['photos'] = photos;
       if (videos != null) body['videos'] = videos;
       if (tags != null) body['tags'] = tags;
-
+      
       final response = await _apiClient.put('/events/$eventId', body: body);
       
       if (response is Map<String, dynamic> && response.containsKey('data')) {
-        print('✅ Updated event: $eventId');
         return response['data'];
       }
-      
       return response;
     } catch (e) {
       print('❌ Update event failed: $e');
@@ -813,45 +812,57 @@ class NetworkingService {
     }
   }
 
-  /// Join or Leave an event
+  /// Provide feedback on event (Join, Check-in, etc.) - Actually this logic is now split.
+  /// For Joining, we use joinEvent below.
+
+  /// Join an event
   Future<Map<String, dynamic>> joinEvent({
     required String eventId,
-    String? participantId,
+    required String participantId,
   }) async {
     if (ApiConfig.useMockAuth) {
-      return {'success': true, 'message': 'Joined mock event', 'isJoined': true};
+      return {'success': true, 'message': 'Joined event (mock)'};
     }
 
     try {
-      // Use the new event-connections endpoint
-      final body = {
-        'eventId': eventId,
-        'participantId': participantId, // Optional if backend infers from token, but controller expects it in body
-      };
-      
-      // If participantId is null, we might need to fetch current user ID or let backend handle it.
-      // The controller expects 'participantId' in body.
-      // Ideally backend should use req.user.userId if participantId is missing.
-      // But for now let's assume caller passes it.
-      
-      final response = await _apiClient.post('/event-connections/toggle', body: body);
-      print('✅ Toggled event participation: $eventId');
+      final response = await _apiClient.post(
+        '/event-connections/toggle-participation',
+        body: {
+          'eventId': eventId,
+          'participantId': participantId,
+        },
+      );
+      print('✅ Joined event: $eventId');
       return response;
     } catch (e) {
-      print('❌ Join/Leave event failed: $e');
+      print('❌ Join event failed: $e');
       rethrow;
     }
   }
 
   /// Get event members
   Future<List<Map<String, dynamic>>> getEventMembers(String eventId) async {
-    if (ApiConfig.useMockAuth) return [];
+    if (ApiConfig.useMockAuth) {
+      return [];
+    }
 
     try {
       final response = await _apiClient.get('/event-connections/participants/$eventId');
       
-      if (response is Map<String, dynamic> && response.containsKey('participants')) {
-        return List<Map<String, dynamic>>.from(response['participants']);
+      if (response is Map<String, dynamic>) {
+          // Check for 'participants' key (Format used by getEventParticipants backend)
+          if (response.containsKey('participants') && response['participants'] is List) {
+             return List<Map<String, dynamic>>.from(response['participants']);
+          }
+          // Fallback or other formats
+          if (response.containsKey('data')) {
+             final data = response['data'];
+             if (data is List) return List<Map<String, dynamic>>.from(data);
+          }
+      }
+      
+      if (response is List) {
+        return List<Map<String, dynamic>>.from(response);
       }
       return [];
     } catch (e) {
@@ -860,22 +871,24 @@ class NetworkingService {
     }
   }
 
-  /// Add event member manually
+  /// Manually add a member to an event
   Future<Map<String, dynamic>> addEventMember({
     required String eventId,
     required String name,
     required String phoneNumber,
+    String? organizerId,
   }) async {
     if (ApiConfig.useMockAuth) return {'success': true};
 
     try {
-      final body = {
-        'eventId': eventId,
-        'name': name,
-        'phoneNumber': phoneNumber,
-      };
-      final response = await _apiClient.post('/event-connections/add-member', body: body);
-      return response;
+        final body = {
+          'eventId': eventId,
+          'name': name,
+          'phoneNumber': phoneNumber,
+            // organizerId is optional now, backend will fetch it if missing
+          if (organizerId != null) 'organizerId': organizerId,
+        };
+        return await _apiClient.post('/event-connections/add-member', body: body);
     } catch (e) {
       print('❌ Add event member failed: $e');
       rethrow;
@@ -885,7 +898,9 @@ class NetworkingService {
   /// Upload event members via Excel
   Future<Map<String, dynamic>> uploadEventMembers({
     required String eventId,
-    required File file,
+    File? file,
+    List<int>? bytes,
+    String? filename,
   }) async {
     if (ApiConfig.useMockAuth) return {'success': true};
 
@@ -893,7 +908,12 @@ class NetworkingService {
       // We pass eventId as a query parameter because ApiClient.uploadFile 
       // currently only supports sending the file in the body.
       // The backend controller has been updated to check req.query.eventId as well.
-      return await _apiClient.uploadFile('/event-connections/upload-members?eventId=$eventId', file);
+      return await _apiClient.uploadFile(
+        '/event-connections/upload-members?eventId=$eventId', 
+        file: file,
+        fileBytes: bytes,
+        filename: filename,
+      );
     } catch (e) {
       print('❌ Upload event members failed: $e');
       rethrow;

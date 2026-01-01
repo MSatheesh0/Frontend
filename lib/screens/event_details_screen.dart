@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import '../models/event.dart';
 import '../utils/theme.dart';
@@ -23,17 +24,37 @@ class EventDetailsScreen extends StatefulWidget {
 
 class _EventDetailsScreenState extends State<EventDetailsScreen> {
   late bool _isJoined;
+  int _memberCount = 0;
+  bool _isLoadingCount = true;
 
   @override
   void initState() {
     super.initState();
     _isJoined = widget.event.isJoined;
+    _fetchMemberCount();
+  }
+
+  Future<void> _fetchMemberCount() async {
+    try {
+      final members = await NetworkingService().getEventMembers(widget.event.id);
+      if (mounted) {
+        setState(() {
+          _memberCount = members.length;
+          _isLoadingCount = false;
+        });
+      }
+    } catch (e) {
+      print('Failed to fetch member count: $e');
+      if (mounted) {
+        setState(() => _isLoadingCount = false);
+      }
+    }
   }
 
   void _joinEventCircle() async {
     try {
       final appState = Provider.of<AppState>(context, listen: false);
-      final userId = appState.currentUser?.id ?? 'user_1'; // Fallback for dev
+      final userId = appState.currentUser?.id ?? 'user_1';
 
       await NetworkingService().joinEvent(
         eventId: widget.event.id,
@@ -43,6 +64,9 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
       setState(() {
         _isJoined = true;
       });
+      
+      // Refresh count after joining
+      _fetchMemberCount();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -93,8 +117,9 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
 
     final appState = Provider.of<AppState>(context);
     final isCreator = appState.currentUser?.id == widget.event.createdBy;
-    final isAdmin = appState.currentUser?.role == 'admin'; // Assuming role check
-    final canViewMembers = isCreator || isAdmin;
+    final isAdmin = appState.currentUser?.role == 'admin';
+    // Allow joined users to view members too
+    final canViewMembers = isCreator || isAdmin || _isJoined;
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -113,23 +138,51 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           ),
         ),
         actions: [
-          if (canViewMembers)
-            IconButton(
-              icon: const Icon(Icons.people, color: AppTheme.textPrimary),
-              tooltip: 'View Members',
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => EventMembersScreen(
-                      eventId: widget.event.id,
-                      eventName: widget.event.name,
-                      isOrganizer: canViewMembers,
-                    ),
+          // Member count / View Members button
+          InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => EventMembersScreen(
+                    eventId: widget.event.id,
+                    eventName: widget.event.name,
+                    isOrganizer: isCreator || isAdmin,
                   ),
-                );
-              },
+                ),
+              ).then((_) => _fetchMemberCount()); // Refresh count on return
+            },
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                children: [
+                   const Icon(Icons.people, color: AppTheme.primaryColor, size: 20),
+                   const SizedBox(width: 6),
+                   if (_isLoadingCount)
+                     const SizedBox(
+                       width: 12, 
+                       height: 12, 
+                       child: CircularProgressIndicator(strokeWidth: 2)
+                     )
+                   else
+                     Text(
+                       '$_memberCount Members', // Explicitly show count
+                       style: const TextStyle(
+                         color: AppTheme.primaryColor,
+                         fontWeight: FontWeight.bold,
+                         fontSize: 13,
+                       ),
+                     ),
+                ],
+              ),
             ),
+          ),
           IconButton(
             icon: const Icon(Icons.share, color: AppTheme.textPrimary),
             onPressed: () {
