@@ -12,6 +12,7 @@ import '../widgets/assistant_activity_list.dart';
 import '../widgets/smart_recommendations_section.dart';
 import 'create_goal_screen.dart';
 import 'goal_insights_screen.dart';
+import 'backend_notification_screen.dart';
 // QR Scanner not compatible with web - commented out
 // import '../widgets/qr_scanner_view.dart';
 // import '../widgets/scan_result_bottom_sheet.dart';
@@ -54,6 +55,52 @@ class DashboardScreen extends StatelessWidget {
                     activeColor: AppTheme.primaryColor,
                   ),
                   const SizedBox(width: AppConstants.spacingSm),
+                ],
+              );
+            },
+          ),
+          Consumer<AppState>(
+            builder: (context, appState, child) {
+              final count = appState.notifications.length;
+              return Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_none, color: AppTheme.textSecondary),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const BackendNotificationScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  if (count > 0)
+                    Positioned(
+                      right: 10,
+                      top: 10,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 14,
+                          minHeight: 14,
+                        ),
+                        child: Text(
+                          count > 9 ? '9+' : '$count',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
                 ],
               );
             },

@@ -771,7 +771,7 @@ class NetworkingService {
   }
 
   /// Update an existing event
-  Future<Map<String, dynamic>> updateEvent({
+    Future<Map<String, dynamic>> updateEvent({
     required String eventId,
     String? name,
     String? headline,
@@ -781,6 +781,7 @@ class NetworkingService {
     List<String>? photos,
     List<String>? videos,
     List<String>? tags,
+    String? pdfFile,
   }) async {
     if (ApiConfig.useMockAuth) {
       return {
@@ -799,6 +800,7 @@ class NetworkingService {
       if (photos != null) body['photos'] = photos;
       if (videos != null) body['videos'] = videos;
       if (tags != null) body['tags'] = tags;
+      if (pdfFile != null) body['pdfFile'] = pdfFile;
       
       final response = await _apiClient.put('/events/$eventId', body: body);
       

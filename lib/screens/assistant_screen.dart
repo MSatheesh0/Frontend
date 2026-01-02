@@ -16,21 +16,7 @@ class AssistantScreen extends StatefulWidget {
 
 class _AssistantScreenState extends State<AssistantScreen> {
   final List<ChatMessage> _messages = [];
-  final List<AssistantAlert> _alerts = [
-    AssistantAlert(
-      id: '1',
-      title:
-          'Your assistant found 2 new investor matches for your current goal.',
-      subtitle: 'Review them?',
-      actionPrompt: 'Show me the 2 new investor matches you mentioned.',
-    ),
-    AssistantAlert(
-      id: '2',
-      title: 'Your pitch deck is missing traction metrics.',
-      subtitle: 'Add them to improve responses.',
-      actionPrompt: 'Help me add traction metrics to my pitch deck.',
-    ),
-  ];
+  final List<AssistantAlert> _alerts = [];
 
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();

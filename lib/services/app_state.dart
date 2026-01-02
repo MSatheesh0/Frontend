@@ -12,6 +12,9 @@ import '../services/auth_service.dart';
 import '../services/networking_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
+import 'dart:async';
+import '../models/app_notification.dart';
+import 'app_notification_service.dart';
 
 class AppState extends ChangeNotifier {
   User? _currentUser;
@@ -24,6 +27,11 @@ class AppState extends ChangeNotifier {
   bool _isNetworkingMode = false;
   List<NetworkCode> _networkCodes = [];
   NetworkCode? _selectedNetworkCode;
+
+  // Notifications state
+  List<AppNotification> _notifications = [];
+  Timer? _notificationTimer;
+  bool _isFetchingNotifications = false;
   
   final _secureStorage = const FlutterSecureStorage();
   static const String _networkModeKey = 'network_mode_active';
@@ -32,6 +40,13 @@ class AppState extends ChangeNotifier {
   AppState() {
     _initUser();
     _restoreNetworkModeState();
+    startNotificationPolling();
+  }
+
+  @override
+  void dispose() {
+    stopNotificationPolling();
+    super.dispose();
   }
 
   Future<void> refreshUser() async {
@@ -118,6 +133,8 @@ class AppState extends ChangeNotifier {
   UserFollowState get followState => _followState;
   List<tagged.Connection> get taggedConnections => _taggedConnections;
   List<tagged.FollowingPerson> get taggedFollowings => _taggedFollowings;
+  List<AppNotification> get notifications => _notifications;
+  int get unreadNotificationsCount => _notifications.where((n) => !n.isRead).length;
 
   // Initialize mock Network Codes - returns empty list
   static List<NetworkCode> _initMockNetworkCodes() {
@@ -238,6 +255,48 @@ class AppState extends ChangeNotifier {
   /// Refresh network codes from database
   Future<void> refreshNetworkCodes() async {
     await loadNetworkCodes();
+  }
+
+  // Notification management
+  void startNotificationPolling() {
+    _notificationTimer?.cancel();
+    _notificationTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
+      refreshNotifications();
+    });
+  }
+
+  void stopNotificationPolling() {
+    _notificationTimer?.cancel();
+    _notificationTimer = null;
+  }
+
+  Future<void> refreshNotifications() async {
+    if (_currentUser == null || _isFetchingNotifications) return;
+    
+    _isFetchingNotifications = true;
+    try {
+      final notifs = await AppNotificationService().getNotifications();
+      _notifications = notifs;
+      notifyListeners();
+    } catch (e) {
+      print('Error fetching notifications in AppState: $e');
+    } finally {
+      _isFetchingNotifications = false;
+    }
+  }
+
+  Future<void> dismissNotification(String id) async {
+    try {
+      // Optimistic update
+      _notifications.removeWhere((n) => n.id == id);
+      notifyListeners();
+      
+      await AppNotificationService().dismissNotification(id);
+    } catch (e) {
+      print('Error dismissing notification: $e');
+      // On error, we could re-fetch
+      refreshNotifications();
+    }
   }
 
   /// Add QR profile (creates in backend)

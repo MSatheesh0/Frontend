@@ -69,7 +69,7 @@ class ApiClient {
           response = await http.Response.fromStream(streamed);
         } else {
           // Standard JSON request logic
-          if (method == 'POST' || method == 'PUT') {
+          if (method == 'POST' || method == 'PUT' || method == 'PATCH') {
              print('\n📤 API CLIENT: $method Request');
              print('   - URL: $url');
              // print('   - Headers: $headers'); 
@@ -96,6 +96,13 @@ class ApiClient {
                 body: body != null ? jsonEncode(body) : null
               ).timeout(ApiConfig.requestTimeout);
               break;
+            case 'PATCH':
+              response = await http.patch(
+                url, 
+                headers: headers, 
+                body: body != null ? jsonEncode(body) : null
+              ).timeout(ApiConfig.requestTimeout);
+              break;
             case 'DELETE':
               response = await http.delete(url, headers: headers).timeout(ApiConfig.requestTimeout);
               break;
@@ -103,7 +110,7 @@ class ApiClient {
               throw Exception('Unsupported HTTP method: $method');
           }
           
-          if (method == 'POST' || method == 'PUT') {
+          if (method == 'POST' || method == 'PUT' || method == 'PATCH') {
               print('📥 API CLIENT: Response received');
               print('   - Status Code: ${response.statusCode}');
               print('   - Response Body: ${response.body}');
@@ -195,6 +202,11 @@ class ApiClient {
   // PUT request
   Future<dynamic> put(String endpoint, {dynamic body}) {
     return _sendRequest('PUT', endpoint, body: body);
+  }
+
+  // PATCH request
+  Future<dynamic> patch(String endpoint, {dynamic body}) {
+    return _sendRequest('PATCH', endpoint, body: body);
   }
 
   // DELETE request

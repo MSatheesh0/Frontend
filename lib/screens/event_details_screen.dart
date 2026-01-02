@@ -9,6 +9,7 @@ import '../services/networking_service.dart';
 import 'package:provider/provider.dart';
 import '../services/app_state.dart';
 import 'event_members_screen.dart';
+import 'add_event_screen.dart';
 
 class EventDetailsScreen extends StatefulWidget {
   final Event event;
@@ -110,6 +111,19 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     );
   }
 
+  void _editEvent() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddEventScreen(event: widget.event),
+      ),
+    );
+    if (result == true) {
+      // Refresh event details
+      Navigator.pop(context, true); 
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('EEEE, MMMM dd, yyyy');
@@ -118,8 +132,8 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     final appState = Provider.of<AppState>(context);
     final isCreator = appState.currentUser?.id == widget.event.createdBy;
     final isAdmin = appState.currentUser?.role == 'admin';
-    // Allow joined users to view members too
-    final canViewMembers = isCreator || isAdmin || _isJoined;
+    // ONLY Creator or Admin can view the full members list now
+    final canViewMembers = isCreator || isAdmin;
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -138,51 +152,52 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           ),
         ),
         actions: [
-          // Member count / View Members button
-          InkWell(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => EventMembersScreen(
-                    eventId: widget.event.id,
-                    eventName: widget.event.name,
-                    isOrganizer: isCreator || isAdmin,
+          // Member count / View Members button (ONLY for Creator/Admin)
+          if (canViewMembers)
+            InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => EventMembersScreen(
+                      eventId: widget.event.id,
+                      eventName: widget.event.name,
+                      isOrganizer: isCreator || isAdmin,
+                    ),
                   ),
+                ).then((_) => _fetchMemberCount()); // Refresh count on return
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-              ).then((_) => _fetchMemberCount()); // Refresh count on return
-            },
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                children: [
-                   const Icon(Icons.people, color: AppTheme.primaryColor, size: 20),
-                   const SizedBox(width: 6),
-                   if (_isLoadingCount)
-                     const SizedBox(
-                       width: 12, 
-                       height: 12, 
-                       child: CircularProgressIndicator(strokeWidth: 2)
-                     )
-                   else
-                     Text(
-                       '$_memberCount Members', // Explicitly show count
-                       style: const TextStyle(
-                         color: AppTheme.primaryColor,
-                         fontWeight: FontWeight.bold,
-                         fontSize: 13,
-                       ),
-                     ),
-                ],
+                child: Row(
+                  children: [
+                    const Icon(Icons.people, color: AppTheme.primaryColor, size: 20),
+                    const SizedBox(width: 6),
+                    if (_isLoadingCount)
+                      const SizedBox(
+                        width: 12, 
+                        height: 12, 
+                        child: CircularProgressIndicator(strokeWidth: 2)
+                      )
+                    else
+                      Text(
+                        '$_memberCount Members', // Explicitly show count
+                        style: const TextStyle(
+                          color: AppTheme.primaryColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
-          ),
           IconButton(
             icon: const Icon(Icons.share, color: AppTheme.textPrimary),
             onPressed: () {
@@ -223,15 +238,28 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Event name
-                  Text(
-                    widget.event.name,
-                    style: const TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
-                      height: 1.2,
-                    ),
+                  // Event name + Edit Button
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.event.name,
+                          style: const TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textPrimary,
+                            height: 1.2,
+                          ),
+                        ),
+                      ),
+                      if (isCreator || isAdmin)
+                        IconButton(
+                          onPressed: _editEvent,
+                          icon: const Icon(Icons.edit_note, color: AppTheme.primaryColor, size: 28),
+                          tooltip: 'Edit Event',
+                        ),
+                    ],
                   ),
                   const SizedBox(height: AppConstants.spacingLg),
 

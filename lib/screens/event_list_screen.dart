@@ -233,10 +233,14 @@ class _EventListScreenState extends State<EventListScreen> {
           IconButton(
             icon: const Icon(Icons.add_circle, color: AppTheme.primaryColor),
             onPressed: () async {
+              final isComm = _selectedTab == 'community';
               final result = await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const AddEventScreen(),
+                  builder: (context) => AddEventScreen(
+                    initialIsEvent: !isComm,
+                    initialIsCommunity: isComm,
+                  ),
                 ),
               );
               if (result == true) {
@@ -677,12 +681,12 @@ class _EventListScreenState extends State<EventListScreen> {
         final result = await Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => const EventStatusScreen(),
+            builder: (context) => AddEventScreen(event: event),
           ),
         );
         if (result == true) _loadEvents();
       },
-      tooltip: 'Manage Circle',
+      tooltip: 'Edit Circle',
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(),
     );

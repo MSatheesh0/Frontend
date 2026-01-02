@@ -8,7 +8,15 @@ import '../utils/theme.dart';
 
 class AddEventScreen extends StatefulWidget {
   final Event? event;
-  const AddEventScreen({super.key, this.event});
+  final bool? initialIsEvent;
+  final bool? initialIsCommunity;
+  
+  const AddEventScreen({
+    super.key, 
+    this.event,
+    this.initialIsEvent,
+    this.initialIsCommunity,
+  });
 
   @override
   State<AddEventScreen> createState() => _AddEventScreenState();
@@ -49,9 +57,15 @@ class _AddEventScreenState extends State<AddEventScreen> {
       _selectedDateTime = widget.event!.dateTime;
       _isEvent = widget.event!.isEvent;
       _isCommunity = widget.event!.isCommunity;
-      // Note: We don't populate photos/videos/pdf here as they are paths or base64
-      // and might need different handling if we want to show existing ones.
-      // For now, we'll focus on text fields and basic flags.
+      _selectedPhotos = List<String>.from(widget.event!.photos);
+      _selectedVideos = List<String>.from(widget.event!.videos);
+    } else {
+      // Set initial values if provided
+      if (widget.initialIsEvent != null) _isEvent = widget.initialIsEvent!;
+      if (widget.initialIsCommunity != null) _isCommunity = widget.initialIsCommunity!;
+      
+      // Mutual exclusivity check
+      if (_isEvent && _isCommunity) _isCommunity = false;
     }
   }
 
@@ -185,6 +199,9 @@ class _AddEventScreenState extends State<AddEventScreen> {
           dateTime: _selectedDateTime,
           location: _locationController.text.trim(),
           tags: tags,
+          photos: _selectedPhotos,
+          videos: _selectedVideos,
+          pdfFile: _selectedPdfBase64,
         );
       } else {
         // Create new event

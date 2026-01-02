@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'add_event_screen.dart';
 import 'event_details_screen.dart';
+import 'event_members_screen.dart';
 
 class EventStatusScreen extends StatefulWidget {
   const EventStatusScreen({super.key});
@@ -20,6 +21,7 @@ class _EventStatusScreenState extends State<EventStatusScreen> with SingleTicker
   late TabController _tabController;
   List<Event> _myEvents = [];
   bool _isLoading = true;
+  String _selectedTab = 'event'; // 'event' or 'community'
 
   @override
   void initState() {
@@ -89,27 +91,52 @@ class _EventStatusScreenState extends State<EventStatusScreen> with SingleTicker
   Widget build(BuildContext context) {
     final now = DateTime.now();
     
-    // 1) Pending Events (isEvent && !isVerified)
-    final pendingEvents = _myEvents.where((e) => e.isEvent && !e.isVerified).toList();
+    // STRICT FILTERING
+    final filteredByTab = _myEvents.where((e) {
+      if (_selectedTab == 'event') {
+        return e.isEvent && !e.isCommunity;
+      } else {
+        return e.isCommunity;
+      }
+    }).toList();
+
+    // 1) Pending (isVerified == false)
+    final pendingEvents = filteredByTab.where((e) => !e.isVerified).toList();
     
-    // 2) Upcoming Events (isVerified && dateTime > now)
-    final upcomingEvents = _myEvents.where((e) => e.isVerified && e.dateTime.isAfter(now)).toList();
+    // 2) Upcoming (isVerified && dateTime > now)
+    final upcomingEvents = filteredByTab.where((e) => e.isVerified && e.dateTime.isAfter(now)).toList();
     
-    // 3) Completed Events (dateTime < now)
-    // Note: Completed events can be verified or not, but usually they are verified.
-    // User requested: "Show events where dateTime < currentDateTime"
-    final completedEvents = _myEvents.where((e) => e.dateTime.isBefore(now)).toList();
+    // 3) Completed (dateTime < now)
+    final completedEvents = filteredByTab.where((e) => e.dateTime.isBefore(now)).toList();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Event Status'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Pending'),
-            Tab(text: 'Upcoming'),
-            Tab(text: 'Completed'),
-          ],
+        title: Text('${_selectedTab == 'event' ? 'Event' : 'Community'} Status'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(100),
+          child: Column(
+            children: [
+              // Toggle Switch
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    _buildTabButton('Events', 'event'),
+                    const SizedBox(width: 12),
+                    _buildTabButton('Communities', 'community'),
+                  ],
+                ),
+              ),
+              TabBar(
+                controller: _tabController,
+                tabs: const [
+                  Tab(text: 'Pending'),
+                  Tab(text: 'Upcoming'),
+                  Tab(text: 'Completed'),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
       body: _isLoading
@@ -125,16 +152,38 @@ class _EventStatusScreenState extends State<EventStatusScreen> with SingleTicker
     );
   }
 
+  Widget _buildTabButton(String label, String tab) {
+    final isSelected = _selectedTab == tab;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedTab = tab),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.primaryColor : Colors.grey[200],
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : AppTheme.textSecondary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildEventList(List<Event> events, {required String type}) {
+    final isComm = _selectedTab == 'community';
     if (events.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.event_note, size: 64, color: Colors.grey[300]),
+            Icon(isComm ? Icons.group_work : Icons.event_note, size: 64, color: Colors.grey[300]),
             const SizedBox(height: 16),
             Text(
-              'No ${type == 'pending' ? 'pending' : type} events found',
+              'No ${type == 'pending' ? 'pending' : type} ${isComm ? 'communities' : 'events'} found',
               style: TextStyle(color: Colors.grey[600], fontSize: 16),
             ),
           ],
@@ -194,17 +243,19 @@ class _EventStatusScreenState extends State<EventStatusScreen> with SingleTicker
               ],
             ),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
-                const SizedBox(width: 6),
-                Text(
-                  dateFormat.format(event.dateTime),
-                  style: TextStyle(color: Colors.grey[600]),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
+            if (event.isEvent) ...[
+              Row(
+                children: [
+                  Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 6),
+                  Text(
+                    dateFormat.format(event.dateTime),
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+            ],
             Row(
               children: [
                 Icon(Icons.location_on_outlined, size: 14, color: Colors.grey[600]),
@@ -229,20 +280,41 @@ class _EventStatusScreenState extends State<EventStatusScreen> with SingleTicker
                   label: const Text('Details'),
                 ),
                 
-                // Edit - Only for Upcoming and Creator
-                if (type == 'upcoming' && isCreator)
+                // Edit - For Creator (Enable even for pending if it's a community)
+                if (isCreator && (type == 'upcoming' || (type == 'pending' && event.isCommunity)))
                   TextButton.icon(
                     onPressed: () async {
                       final result = await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => AddEventScreen(event: event),
+                          builder: (context) => AddEventScreen(
+                            event: event,
+                            initialIsEvent: event.isEvent,
+                            initialIsCommunity: event.isCommunity,
+                          ),
                         ),
                       );
                       if (result == true) _loadEvents();
                     },
                     icon: const Icon(Icons.edit_outlined, size: 18),
                     label: const Text('Edit'),
+                  ),
+
+                // Members - For Creator or Admin to manage/view joined people
+                if (isCreator || isAdmin)
+                  TextButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => EventMembersScreen(
+                          eventId: event.id,
+                          eventName: event.name,
+                          isOrganizer: isCreator || isAdmin,
+                        ),
+                      ),
+                    ),
+                    icon: const Icon(Icons.people_outline, size: 18),
+                    label: const Text('Members'),
                   ),
 
                 // Delete/Cancel - For Creator or Admin

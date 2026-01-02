@@ -30,42 +30,6 @@ class Recommendation {
 
   // Mock recommendations for dashboard
   static List<Recommendation> getMockRecommendations() {
-    return [
-      Recommendation(
-        id: '1',
-        type: RecommendationType.matchNda,
-        title: 'Assistant found a promising match that requires NDA approval',
-        subtitle: 'Approve to let your assistant continue the conversation.',
-        matchId: 'match_001',
-      ),
-      Recommendation(
-        id: '2',
-        type: RecommendationType.missedOpportunities,
-        title: 'You missed 35 opportunities due to missing ISO certification',
-        subtitle: 'Fix this to unlock larger enterprise / government deals.',
-      ),
-      Recommendation(
-        id: '3',
-        type: RecommendationType.missingPitchInfo,
-        title: 'Your pitch deck is missing traction metrics',
-        subtitle: 'Investors asked about revenue and active users.',
-        goalId: 'goal_123',
-      ),
-      Recommendation(
-        id: '4',
-        type: RecommendationType.eventSuggestion,
-        title: 'AI in Manufacturing event next week',
-        subtitle: 'Attending can improve your visibility in target sector.',
-        payload:
-            '{"eventName": "AI in Manufacturing Summit", "date": "2025-11-27", "location": "San Francisco"}',
-      ),
-      Recommendation(
-        id: '5',
-        type: RecommendationType.missingBusinessInfo,
-        title: 'Investor asked for your last 6 months turnover',
-        subtitle: 'Provide this info to move forward with the conversation.',
-        matchId: 'match_045',
-      ),
-    ];
+    return [];
   }
 }
