@@ -15,6 +15,9 @@ class ApiClient {
   static const String _tokenKey = 'auth_token';
   static const String _refreshTokenKey = 'refresh_token';
   
+  // Callback to notify AuthService or others when token is refreshed
+  static void Function(String)? onTokenRefreshed;
+  
   // Stream to notify app when session expires (401 + refresh failed)
   static final StreamController<void> sessionExpiredController = StreamController<void>.broadcast();
   
@@ -38,7 +41,7 @@ class ApiClient {
     String? filename,
     String fieldName = 'file',
   }) async {
-    int retries = 1;
+    int retries = 2; // Increased retries for better stability
     while (true) {
       try {
         final url = Uri.parse('${ApiConfig.baseUrl}$endpoint');
@@ -146,14 +149,45 @@ class ApiClient {
     }
   }
 
+  // Synchronized refresh to prevent concurrent workers from all hitting /refresh at once
+  static Future<bool>? _ongoingRefresh;
+
   // Refresh Token Logic
   Future<bool> _refreshToken() async {
+    // Check if token changed while this request was waiting (another request might have refreshed it)
+    final initialToken = await _storage.read(key: _tokenKey);
+
+    // If a refresh is already happening, Wait for it!
+    if (_ongoingRefresh != null) {
+      print('⏳ waiting for ongoing token refresh...');
+      await _ongoingRefresh!;
+      
+      final currentToken = await _storage.read(key: _tokenKey);
+      if (currentToken != initialToken && currentToken != null) {
+          print('✨ Token was already refreshed by another concurrent request.');
+          return true;
+      }
+    }
+
+    _ongoingRefresh = _performRefresh();
+    try {
+      final success = await _ongoingRefresh!;
+      return success;
+    } finally {
+      _ongoingRefresh = null; // Reset for next time
+    }
+  }
+
+  Future<bool> _performRefresh() async {
     try {
       final refreshToken = await _storage.read(key: _refreshTokenKey);
-      if (refreshToken == null) return false;
+      if (refreshToken == null) {
+        print('❌ Refresh failed: No refresh token in storage');
+        return false;
+      }
 
       final url = Uri.parse('${ApiConfig.baseUrl}/auth/refresh');
-      print('🔄 Refreshing Token...');
+      print('🔄 Refreshing Access Token...');
 
       // Call directly with http to avoid interceptor loop
       final response = await http.post(
@@ -168,24 +202,38 @@ class ApiClient {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final newAccessToken = data['accessToken'];
-        final newRefreshToken = data['refreshToken']; // Check for new refresh token
+        final newRefreshToken = data['refreshToken']; 
         
         if (newAccessToken != null) {
+           print('✅ Token refresh successful');
            await _storage.write(key: _tokenKey, value: newAccessToken);
            
-           // If backend rotates refresh tokens, save the new one!
            if (newRefreshToken != null) {
                print('🔄 Updating Refresh Token (Rotation detected)');
                await _storage.write(key: _refreshTokenKey, value: newRefreshToken);
            }
            
+           if (onTokenRefreshed != null) {
+              onTokenRefreshed!(newAccessToken);
+           }
+           
            return true; 
         }
       }
-      return false;
+      
+      // CRITICAL: distinguish between "Token Expired" (4xx) and "Server Error" (5xx)
+      if (response.statusCode >= 400 && response.statusCode < 500) {
+          print('❌ Token refresh REJECTED by server: ${response.statusCode}');
+          print('   - Response: ${response.body}');
+          return false; // This triggers logout
+      } else {
+          // Server error or network issue
+          print('⚠️ Server error during refresh (${response.statusCode}). Will retry request later.');
+          throw ApiException(message: 'Server error during refresh', statusCode: response.statusCode);
+      }
     } catch (e) {
-      print('Refresh token error: $e');
-      return false;
+      print('❌ Refresh token exception (network?): $e');
+      rethrow; // Rethrowing ensures we don't return 'false' and trigger logout for network blips
     }
   }
 

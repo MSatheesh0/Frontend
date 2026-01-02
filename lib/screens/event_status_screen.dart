@@ -10,7 +10,14 @@ import 'event_details_screen.dart';
 import 'event_members_screen.dart';
 
 class EventStatusScreen extends StatefulWidget {
-  const EventStatusScreen({super.key});
+  final String initialTab;
+  final bool hideToggle;
+
+  const EventStatusScreen({
+    super.key,
+    this.initialTab = 'event',
+    this.hideToggle = false,
+  });
 
   @override
   State<EventStatusScreen> createState() => _EventStatusScreenState();
@@ -21,13 +28,35 @@ class _EventStatusScreenState extends State<EventStatusScreen> with SingleTicker
   late TabController _tabController;
   List<Event> _myEvents = [];
   bool _isLoading = true;
-  String _selectedTab = 'event'; // 'event' or 'community'
+  late String _selectedTab;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _selectedTab = widget.initialTab;
+    _tabController = TabController(
+      length: _selectedTab == 'event' ? 3 : 2,
+      vsync: this,
+    );
     _loadEvents();
+  }
+
+  void _switchCircleType(String tab) {
+    if (_selectedTab == tab) return;
+    setState(() {
+      _selectedTab = tab;
+      _tabController.dispose();
+      _tabController = TabController(
+        length: _selectedTab == 'event' ? 3 : 2,
+        vsync: this,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadEvents() async {
@@ -99,15 +128,16 @@ class _EventStatusScreenState extends State<EventStatusScreen> with SingleTicker
         return e.isCommunity;
       }
     }).toList();
-
-    // 1) Pending (isVerified == false)
+    
+    // 1) Pending (isVerified == false) - Common for both
     final pendingEvents = filteredByTab.where((e) => !e.isVerified).toList();
     
-    // 2) Upcoming (isVerified && dateTime > now)
-    final upcomingEvents = filteredByTab.where((e) => e.isVerified && e.dateTime.isAfter(now)).toList();
+    // 2) Event specific time-based filtering
+    final upcomingEvents = filteredByTab.where((e) => e.isEvent && e.isVerified && e.dateTime.isAfter(now)).toList();
+    final completedEvents = filteredByTab.where((e) => e.isEvent && e.isVerified && e.dateTime.isBefore(now)).toList();
     
-    // 3) Completed (dateTime < now)
-    final completedEvents = filteredByTab.where((e) => e.dateTime.isBefore(now)).toList();
+    // 3) Community specific filtering (No time logic, just verified)
+    final activeCommunities = filteredByTab.where((e) => e.isCommunity && e.isVerified).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -117,23 +147,29 @@ class _EventStatusScreenState extends State<EventStatusScreen> with SingleTicker
           child: Column(
             children: [
               // Toggle Switch
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
-                  children: [
-                    _buildTabButton('Events', 'event'),
-                    const SizedBox(width: 12),
-                    _buildTabButton('Communities', 'community'),
-                  ],
+              if (!widget.hideToggle)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      _buildTabButton('Events', 'event'),
+                      const SizedBox(width: 12),
+                      _buildTabButton('Communities', 'community'),
+                    ],
+                  ),
                 ),
-              ),
               TabBar(
                 controller: _tabController,
-                tabs: const [
-                  Tab(text: 'Pending'),
-                  Tab(text: 'Upcoming'),
-                  Tab(text: 'Completed'),
-                ],
+                tabs: _selectedTab == 'event'
+                  ? const [
+                      Tab(text: 'Pending'),
+                      Tab(text: 'Upcoming'),
+                      Tab(text: 'Completed'),
+                    ]
+                  : const [
+                      Tab(text: 'Pending'),
+                      Tab(text: 'Active'),
+                    ],
               ),
             ],
           ),
@@ -143,11 +179,16 @@ class _EventStatusScreenState extends State<EventStatusScreen> with SingleTicker
           ? const Center(child: CircularProgressIndicator())
           : TabBarView(
               controller: _tabController,
-              children: [
-                _buildEventList(pendingEvents, type: 'pending'),
-                _buildEventList(upcomingEvents, type: 'upcoming'),
-                _buildEventList(completedEvents, type: 'completed'),
-              ],
+              children: _selectedTab == 'event'
+                ? [
+                    _buildEventList(pendingEvents, type: 'pending'),
+                    _buildEventList(upcomingEvents, type: 'upcoming'),
+                    _buildEventList(completedEvents, type: 'completed'),
+                  ]
+                : [
+                    _buildEventList(pendingEvents, type: 'pending'),
+                    _buildEventList(activeCommunities, type: 'active'),
+                  ],
             ),
     );
   }
@@ -155,7 +196,7 @@ class _EventStatusScreenState extends State<EventStatusScreen> with SingleTicker
   Widget _buildTabButton(String label, String tab) {
     final isSelected = _selectedTab == tab;
     return GestureDetector(
-      onTap: () => setState(() => _selectedTab = tab),
+      onTap: () => _switchCircleType(tab),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(

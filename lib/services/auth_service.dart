@@ -8,7 +8,10 @@ import '../config/api_config.dart';
 class AuthService {
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
-  AuthService._internal();
+  AuthService._internal() {
+    // Register callback for background token refreshes
+    ApiClient.onTokenRefreshed = updateToken;
+  }
 
   final _secureStorage = const FlutterSecureStorage();
   final _apiClient = ApiClient();
@@ -16,6 +19,7 @@ class AuthService {
   static const String _tokenKey = 'auth_token';
   static const String _refreshTokenKey = 'refresh_token';
   static const String _userKey = 'user_data';
+  static const String _deviceIdKey = 'device_id';
 
   Map<String, dynamic>? _currentUser;
   String? _authToken;
@@ -28,6 +32,21 @@ class AuthService {
 
   /// Get auth token
   String? get authToken => _authToken;
+
+  /// Update auth token in memory (called by ApiClient after refresh)
+  void updateToken(String token) {
+    _authToken = token;
+  }
+
+  /// Get Device ID (persistent per install)
+  Future<String> _getOrCreateDeviceId() async {
+    String? deviceId = await _secureStorage.read(key: _deviceIdKey);
+    if (deviceId == null) {
+      deviceId = 'mobile_${DateTime.now().millisecondsSinceEpoch}';
+      await _secureStorage.write(key: _deviceIdKey, value: deviceId);
+    }
+    return deviceId;
+  }
 
   /// Request OTP for email
   Future<void> requestOtp(String email) async {
@@ -46,11 +65,14 @@ class AuthService {
   /// Verify OTP and Sign In
   Future<Map<String, dynamic>> verifyOtp(String email, String otp, {bool logoutFromOtherDevices = false}) async {
     try {
+      final deviceId = await _getOrCreateDeviceId();
       final response = await _apiClient.post(
         ApiConfig.verifyOtpEndpoint,
         body: {
           'email': email,
           'otp': otp,
+          'deviceId': deviceId,
+          'deviceInfo': 'Mobile App (WayTree)',
           if (logoutFromOtherDevices) 'logoutFromOtherDevices': true,
         },
       );
@@ -182,14 +204,26 @@ class AuthService {
 
   /// Sign out user
   Future<void> signOut() async {
-    _currentUser = null;
-    _authToken = null;
+    try {
+      final refreshToken = await _secureStorage.read(key: _refreshTokenKey);
+      if (refreshToken != null) {
+        // Notify backend to invalidate the session
+        await _apiClient.post('/auth/logout', body: {'refreshToken': refreshToken});
+      }
+    } catch (e) {
+      print('⚠️ Backend logout failed (skipping): $e');
+    } finally {
+      // Always clear local state
+      _currentUser = null;
+      _authToken = null;
 
-    await _secureStorage.delete(key: _tokenKey);
-    await _secureStorage.delete(key: _refreshTokenKey);
-    await _secureStorage.delete(key: _userKey);
+      await _secureStorage.delete(key: _tokenKey);
+      await _secureStorage.delete(key: _refreshTokenKey);
+      await _secureStorage.delete(key: _userKey);
+      // We keep _deviceIdKey so the device remains uniquely identified permanently
 
-    print('✅ User signed out');
+      print('✅ User signed out locally');
+    }
   }
 
   /// Restore session from secure storage

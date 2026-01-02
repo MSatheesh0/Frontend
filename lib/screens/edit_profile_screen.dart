@@ -162,10 +162,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     } catch (e) {
       if (!mounted) return;
       
+      String errorMsg = 'Error: ${e.toString()}';
+      if (e.toString().contains('409') || e.toString().contains('Conflict')) {
+        errorMsg = e.toString().replaceAll('Exception:', '').trim();
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('❌ Error: ${e.toString()}'),
+          content: Text('❌ $errorMsg'),
           backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
         ),
       );
     } finally {

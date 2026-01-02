@@ -221,14 +221,17 @@ class _EventListScreenState extends State<EventListScreen> {
               final result = await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const EventStatusScreen(),
+                  builder: (context) => EventStatusScreen(
+                    initialTab: _selectedTab,
+                    hideToggle: true,
+                  ),
                 ),
               );
               if (result == true) {
                 _loadEvents();
               }
             },
-            tooltip: 'Event Status',
+            tooltip: _selectedTab == 'event' ? 'Event Status' : 'Community Status',
           ),
           IconButton(
             icon: const Icon(Icons.add_circle, color: AppTheme.primaryColor),

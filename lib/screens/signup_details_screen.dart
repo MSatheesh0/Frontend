@@ -100,10 +100,20 @@ class _SignupDetailsScreenState extends State<SignupDetailsScreen> {
     } catch (e) {
       if (!mounted) return;
 
+      String errorMessage = 'Failed to save profile: ${e.toString()}';
+      
+      // Handle Conflict (Duplicate Phone Number)
+      if (e.toString().contains('409') || e.toString().contains('Conflict')) {
+        // The backend message already contains the email and instruction.
+        // We just need to make sure it's shown clearly.
+        errorMessage = e.toString().replaceAll('Exception:', '').trim();
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to save profile: ${e.toString()}'),
+          content: Text(errorMessage),
           backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
         ),
       );
     } finally {

@@ -86,8 +86,15 @@ class _EventMembersScreenState extends State<EventMembersScreen> {
                     const SnackBar(content: Text('Member added successfully')),
                   );
                 } catch (e) {
+                  String errorMsg = e.toString();
+                  if (errorMsg.contains('Conflict') || errorMsg.contains('409')) {
+                    errorMsg = errorMsg.replaceAll('Exception:', '').trim();
+                  }
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to add member: $e')),
+                    SnackBar(
+                      content: Text(errorMsg),
+                      backgroundColor: Colors.red,
+                    ),
                   );
                 }
               }
@@ -124,53 +131,22 @@ class _EventMembersScreenState extends State<EventMembersScreen> {
         );
 
         try {
-          if (kIsWeb) {
-             print('🌐 Web Environment detected.');
-             print('📂 Checking bytes...');
-             if (platformFile.bytes != null) {
-                print('✅ Bytes found (${platformFile.bytes!.length}). Uploading via bytes...');
-                await _networkingService.uploadEventMembers(
-                  eventId: widget.eventId,
-                  bytes: platformFile.bytes,
-                  filename: platformFile.name,
-                );
-             } else {
-                print('❌ Web Error: Bytes are null!');
-                throw Exception('File bytes are missing on Web.');
-             }
-          } else {
-             // Native
-             print('💻 Native Environment detected.');
-             // Accessing .path on native is safe, but let's be careful
-             final filePath = platformFile.path;
-             print('📂 File Path: $filePath');
-             
-             if (filePath != null) {
-                 await _networkingService.uploadEventMembers(
-                   eventId: widget.eventId,
-                   file: File(filePath),
-                 );
-             } else {
-                 // Fallback to bytes if path is weirdly null on native (e.g. MacOS cached?)
-                 if (platformFile.bytes != null) {
-                    print('⚠️ Path null on native, but bytes found. Using bytes.');
-                    await _networkingService.uploadEventMembers(
-                      eventId: widget.eventId,
-                      bytes: platformFile.bytes,
-                      filename: platformFile.name,
-                    );
-                 } else {
-                    throw Exception('File path and bytes are both missing.');
-                 }
-             }
-          }
-
           if (mounted) {
              Navigator.pop(context); // Hide loading
              _refreshMembers();
-             ScaffoldMessenger.of(context).showSnackBar(
-               const SnackBar(content: Text('Members uploaded successfully')),
+             
+             final response = await _networkingService.uploadEventMembers(
+               eventId: widget.eventId,
+               bytes: platformFile.bytes,
+               filename: platformFile.name,
+               file: kIsWeb ? null : File(platformFile.path!),
              );
+
+             final addedCount = response['addedCount'] ?? 0;
+             final duplicateCount = response['duplicateCount'] ?? 0;
+             final duplicates = response['duplicates'] as List?;
+
+             _showUploadSummary(addedCount, duplicateCount, duplicates);
           }
         } catch (uploadError) {
           print('❌ Upload Process Error: $uploadError');
@@ -398,6 +374,47 @@ class _EventMembersScreenState extends State<EventMembersScreen> {
     );
   }
   
+  void _showUploadSummary(int added, int duplicatesCount, List? duplicates) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Upload Summary'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('✅ Members added: $added', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text('❌ Duplicates rejected: $duplicatesCount', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+            if (duplicates != null && duplicates.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text('Duplicate Numbers:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              SizedBox(
+                height: 100,
+                width: double.maxFinite,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: duplicates.length,
+                  itemBuilder: (context, index) {
+                    final d = duplicates[index];
+                    return Text('• ${d['phoneNumber']} (${d['name']})', style: const TextStyle(fontSize: 12));
+                  },
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDetailRow(IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),

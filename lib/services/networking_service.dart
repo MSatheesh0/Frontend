@@ -722,7 +722,7 @@ class NetworkingService {
     String? createdBy,
     bool isEvent = true,
     bool isCommunity = false,
-    String? pdfFile, // Base64 encoded PDF (only for events)
+    List<String>? pdfFiles, // Updated to accept multiple PDFs
   }) async {
     if (ApiConfig.useMockAuth) {
       return {
@@ -753,7 +753,7 @@ class NetworkingService {
         'tags': tags,
         'isEvent': isEvent,
         'isCommunity': isCommunity,
-        if (pdfFile != null) 'pdfFile': pdfFile, // Only include if provided
+        if (pdfFiles != null) 'pdfFiles': pdfFiles, // Simplified list support
       };
 
       final response = await _apiClient.post('/events', body: body);
@@ -781,7 +781,7 @@ class NetworkingService {
     List<String>? photos,
     List<String>? videos,
     List<String>? tags,
-    String? pdfFile,
+    List<String>? pdfFiles,
   }) async {
     if (ApiConfig.useMockAuth) {
       return {
@@ -800,7 +800,7 @@ class NetworkingService {
       if (photos != null) body['photos'] = photos;
       if (videos != null) body['videos'] = videos;
       if (tags != null) body['tags'] = tags;
-      if (pdfFile != null) body['pdfFile'] = pdfFile;
+      if (pdfFiles != null) body['pdfFiles'] = pdfFiles;
       
       final response = await _apiClient.put('/events/$eventId', body: body);
       

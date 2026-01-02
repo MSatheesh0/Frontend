@@ -41,9 +41,9 @@ class _AddEventScreenState extends State<AddEventScreen> {
   bool _isCommunity = false;
   bool _isLoading = false;
   
-  // PDF file (only for events)
-  String? _selectedPdfBase64;
-  String? _selectedPdfName;
+  // PDF files (for both events & communities)
+  List<String> _selectedPdfBase64s = [];
+  List<String> _selectedPdfNames = [];
 
   @override
   void initState() {
@@ -110,6 +110,11 @@ class _AddEventScreenState extends State<AddEventScreen> {
   }
 
   Future<void> _pickPdf() async {
+    if (_selectedPdfBase64s.length >= 10) {
+      _showError('You can only upload up to 10 PDFs');
+      return;
+    }
+
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -121,8 +126,8 @@ class _AddEventScreenState extends State<AddEventScreen> {
         final base64Pdf = base64Encode(bytes);
         
         setState(() {
-          _selectedPdfBase64 = 'data:application/pdf;base64,$base64Pdf';
-          _selectedPdfName = result.files.single.name;
+          _selectedPdfBase64s.add('data:application/pdf;base64,$base64Pdf');
+          _selectedPdfNames.add(result.files.single.name);
         });
         
         print('📄 PDF selected: ${result.files.single.name} (${bytes.length} bytes)');
@@ -130,6 +135,13 @@ class _AddEventScreenState extends State<AddEventScreen> {
     } catch (e) {
       _showError('Failed to pick PDF: $e');
     }
+  }
+
+  void _removePdf(int index) {
+    setState(() {
+      _selectedPdfBase64s.removeAt(index);
+      _selectedPdfNames.removeAt(index);
+    });
   }
 
   Future<void> _selectDateTime() async {
@@ -201,7 +213,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
           tags: tags,
           photos: _selectedPhotos,
           videos: _selectedVideos,
-          pdfFile: _selectedPdfBase64,
+          pdfFiles: _selectedPdfBase64s.isNotEmpty ? _selectedPdfBase64s : null,
         );
       } else {
         // Create new event
@@ -218,7 +230,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
           tags: tags,
           isEvent: _isEvent,
           isCommunity: _isCommunity,
-          pdfFile: (_isEvent && _selectedPdfBase64 != null) ? _selectedPdfBase64 : null,
+          pdfFiles: _selectedPdfBase64s.isNotEmpty ? _selectedPdfBase64s : null,
         );
       }
       
@@ -267,7 +279,11 @@ class _AddEventScreenState extends State<AddEventScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          widget.event != null ? 'Edit Event' : 'Create New',
+          widget.event != null 
+            ? (_isEvent ? 'Edit Event' : 'Edit Community')
+            : (widget.initialIsEvent != null || widget.initialIsCommunity != null
+                ? (_isEvent ? 'Create Event' : 'Create Community')
+                : 'Create New'),
           style: const TextStyle(
             color: AppTheme.textPrimary,
             fontWeight: FontWeight.w600,
@@ -303,75 +319,76 @@ class _AddEventScreenState extends State<AddEventScreen> {
         child: ListView(
           padding: const EdgeInsets.all(AppConstants.spacingLg),
           children: [
-            // Type Toggles
-            // Type Selection Buttons
-            Row(
-              children: [
-                // Event Button
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _isEvent = true;
-                        _isCommunity = false;
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: _isEvent ? AppTheme.primaryColor : Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: _isEvent ? AppTheme.primaryColor : Colors.grey[300]!,
+            // Type Selection Buttons (Show only when creating and no initial type is forced)
+            if (widget.event == null && widget.initialIsEvent == null && widget.initialIsCommunity == null) ...[
+              Row(
+                children: [
+                  // Event Button
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _isEvent = true;
+                          _isCommunity = false;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: _isEvent ? AppTheme.primaryColor : Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: _isEvent ? AppTheme.primaryColor : Colors.grey[300]!,
+                          ),
                         ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        'Event',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: _isEvent ? Colors.white : AppTheme.textPrimary,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                
-                // Community Button
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _isCommunity = true;
-                        _isEvent = false;
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: _isCommunity ? AppTheme.primaryColor : Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: _isCommunity ? AppTheme.primaryColor : Colors.grey[300]!,
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        'Community',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: _isCommunity ? Colors.white : AppTheme.textPrimary,
+                        alignment: Alignment.center,
+                        child: Text(
+                          'Event',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: _isEvent ? Colors.white : AppTheme.textPrimary,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppConstants.spacingLg),
+                  const SizedBox(width: 16),
+                  
+                  // Community Button
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _isCommunity = true;
+                          _isEvent = false;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: _isCommunity ? AppTheme.primaryColor : Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: _isCommunity ? AppTheme.primaryColor : Colors.grey[300]!,
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          'Community',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: _isCommunity ? Colors.white : AppTheme.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppConstants.spacingLg),
+            ],
 
             // Event Name
             _buildSectionLabel(_isEvent ? 'Event Name' : 'Community Name', required: true),
@@ -384,7 +401,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
               ),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
-                  return 'Event name is required';
+                  return '${_isEvent ? 'Event' : 'Community'} name is required';
                 }
                 return null;
               },
@@ -581,64 +598,62 @@ class _AddEventScreenState extends State<AddEventScreen> {
             ),
             const SizedBox(height: AppConstants.spacingLg),
 
-            // PDF Upload (Only for Events, not Communities)
-            if (_isEvent) ...[
-              _buildSectionLabel('Event Details PDF (Optional)'),
-              const SizedBox(height: AppConstants.spacingSm),
-              
-              if (_selectedPdfName != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.green[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.green[300]!),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.picture_as_pdf, color: Colors.red),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          _selectedPdfName!,
-                          style: const TextStyle(fontSize: 14),
-                          overflow: TextOverflow.ellipsis,
+            // PDF Upload (For both Events and Communities)
+            _buildSectionLabel('Details PDF (Max 10)'),
+            const SizedBox(height: AppConstants.spacingSm),
+            
+            if (_selectedPdfNames.isNotEmpty) ...[
+              Column(
+                children: _selectedPdfNames.asMap().entries.map((entry) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.green[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green[300]!),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.picture_as_pdf, color: Colors.red),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            entry.value,
+                            style: const TextStyle(fontSize: 14),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, size: 20),
-                        onPressed: () {
-                          setState(() {
-                            _selectedPdfBase64 = null;
-                            _selectedPdfName = null;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppConstants.spacingSm),
-              ],
-              
-              OutlinedButton.icon(
-                onPressed: _pickPdf,
-                icon: const Icon(Icons.upload_file),
-                label: Text(_selectedPdfName == null ? 'Upload PDF' : 'Replace PDF'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 20),
+                          onPressed: () => _removePdf(entry.key),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
               ),
               const SizedBox(height: AppConstants.spacingSm),
-              Text(
-                'Upload a PDF with event details for better AI-powered recommendations',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-              const SizedBox(height: AppConstants.spacingLg),
             ],
+            
+            OutlinedButton.icon(
+              onPressed: _pickPdf,
+              icon: const Icon(Icons.upload_file),
+              label: Text(_selectedPdfNames.isEmpty ? 'Upload PDF' : 'Add More PDFs (${_selectedPdfNames.length}/10)'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+            const SizedBox(height: AppConstants.spacingSm),
+            Text(
+              'Upload PDFs with details for better AI-powered recommendations and search',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(height: AppConstants.spacingLg),
 
             // Tags
             _buildSectionLabel('Tags'),
